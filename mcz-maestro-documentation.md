@@ -469,6 +469,7 @@ Secrets attendus dans `secrets.yaml` : `wifi_ssid`, `wifi_password`, `esphome_en
 |---|---|
 | Température ambiante | Capteur |
 | Température fumées | Capteur |
+| Puissance | Capteur, lecture seule |
 | État | Texte |
 | Alarme | Binaire |
 | Brasier à nettoyer | Binaire |
@@ -477,11 +478,11 @@ Secrets attendus dans `secrets.yaml` : `wifi_ssid`, `wifi_password`, `esphome_en
 
 | Entité | Type | Paramètre |
 |---|---|---|
-| Thermostat | Climat (arrêt / chauffage, consigne, température ambiante) | 34 et 42 |
+| Thermostat | Climat (arrêt / chauffage, consigne, température ambiante, préréglages Manuel / Automatique) | 34, 42 et 40 |
 | Marche | Interrupteur | 34 |
 | Consigne | Nombre, 5 à 35 °C par pas de 0,5 | 42 |
 | Mode de régulation | Liste : Manuel / Automatique | 40 |
-| Puissance | Nombre, 1 à 5 (envoyé comme 11 à 15) | 36 |
+| Puissance (réglage) | Nombre, 1 à 5 (envoyé comme 11 à 15), ignoré en mode automatique | 36 |
 | Ventilation | Liste : No Air / 1 à 5 / Automatique | 37 |
 | Ventilation canalisée | Liste : No Air / 1 à 5 / Automatique | 38 |
 | Mode éco | Interrupteur | 41 |
@@ -525,16 +526,26 @@ L'entité « Thermostat » regroupe la marche/arrêt, la consigne et la tempéra
 - Passer en mode chauffage envoie le paramètre 34 à `1` ; passer en arrêt l'envoie à `40`.
 - Changer la consigne envoie le paramètre 42, arrondi au demi-degré.
 - L'état affiché vient uniquement de ce que le poêle renvoie. Après une commande, il se met à jour à la trame d'information suivante.
-- Les entités « Marche » et « Consigne » restent disponibles séparément.
+- Les préréglages « Manuel » et « Automatique » portent le mode de régulation : en choisir un envoie le paramètre 40.
+- Les entités « Marche », « Consigne » et « Mode de régulation » restent disponibles séparément, synchronisées avec le thermostat.
 
 ### Mode de régulation
 
 Le poêle a deux modes de fonctionnement :
 
-- **Manuel** : il fonctionne à la puissance choisie (entité « Puissance »).
-- **Automatique** : il module lui-même sa puissance selon la consigne et la température ambiante.
+- **Automatique** : il module lui-même sa puissance selon la consigne et la température ambiante. C'est le thermostat qui pilote le poêle.
+- **Manuel** : il fonctionne à la puissance choisie. La consigne du thermostat est sans effet ; le thermostat ne sert plus qu'à la marche et à l'arrêt.
 
-L'entité « Mode de régulation » lit le champ 22 et écrit le paramètre 40 (0 = manuel, 1 = automatique).
+Le mode se choisit par les préréglages du thermostat ou par l'entité « Mode de régulation » ; les deux lisent le champ 22 et écrivent le paramètre 40 (0 = manuel, 1 = automatique).
+
+La puissance est exposée par deux entités :
+
+| Entité | Rôle |
+|---|---|
+| Puissance | Capteur en lecture seule : puissance réelle, dans les deux modes |
+| Puissance (réglage) | Commande, utile en mode manuel. En mode automatique, l'écriture est ignorée et un avertissement est écrit dans les logs |
+
+Pour n'afficher que les commandes utiles, on peut conditionner la visibilité des cartes du tableau de bord à l'état de « Mode de régulation » : thermostat et capteur de puissance en automatique, réglage de puissance en manuel.
 
 ### Action `send_command`
 

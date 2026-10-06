@@ -100,6 +100,10 @@ globals:
   - id: last_reply
     type: uint32_t
     initial_value: '0'
+  # Mode de regulation recu du poele : -1 = inconnu, 0 = manuel, 1 = automatique
+  - id: control_mode
+    type: int
+    initial_value: '-1'
   # Sonde virtuelle
   - id: last_cmd
     type: std::string
@@ -221,6 +225,7 @@ interval:
             const auto cl_mode = cl->mode;
             const auto cl_action = cl->action;
             const float cl_target = cl->target_temperature;
+            bool cl_changed = false;
             auto num = [&](size_t i) { return (float) strtol(f[i].c_str(), nullptr, 16); };
 
             if (has(1)) {
@@ -315,9 +320,17 @@ interval:
             if (has(20)) id(sw_active).publish_state(num(20) != 0);
             if (has(22)) {                       // mode de regulation : 0 = manuel, 1 = automatique
               int cm = (int) num(22);
-              if (cm == 0) id(sel_control_mode).publish_state("Manuel");
-              else if (cm == 1) id(sel_control_mode).publish_state("Automatique");
-              else ESP_LOGW("mcz", "Mode de regulation inconnu : %d", cm);
+              if (cm == 0 || cm == 1) {
+                const char *label = cm == 1 ? "Automatique" : "Manuel";
+                id(sel_control_mode).publish_state(label);
+                if (cm != id(control_mode)) {    // prereglage du thermostat
+                  id(control_mode) = cm;
+                  cl->set_custom_preset(label);
+                  cl_changed = true;
+                }
+              } else {
+                ESP_LOGW("mcz", "Mode de regulation inconnu : %d", cm);
+              }
             }
             if (has(23)) id(sw_eco).publish_state(num(23) != 0);
             if (has(24)) id(sw_silent).publish_state(num(24) != 0);
@@ -329,7 +342,9 @@ interval:
             if (has(28)) id(board_temp).publish_state(num(28) / 2.0f);
             if (has(29)) {                       // la carte mere renvoie 11 a 15 pour les puissances 1 a 5
               float pw = num(29);
-              id(num_power).publish_state(pw > 10 ? pw - 10 : pw);
+              pw = pw > 10 ? pw - 10 : pw;
+              id(num_power).publish_state(pw);
+              id(power_level).publish_state(pw);
             }
             if (has(30)) {                       // 3 octets : majeur.mineur.correctif (0x010802 = 1.8.2)
               long v = strtol(f[30].c_str(), nullptr, 16);
@@ -349,7 +364,7 @@ interval:
             if (has(52)) id(probe_readback).publish_state(num(52) / 2.0f);
 
             // Thermostat : publication seulement si quelque chose a change
-            if (cl->mode != cl_mode || cl->action != cl_action ||
+            if (cl_changed || cl->mode != cl_mode || cl->action != cl_action ||
                 (cl->target_temperature != cl_target &&
                  !(std::isnan(cl->target_temperature) && std::isnan(cl_target))))
               cl->publish_state();
@@ -446,6 +461,13 @@ sensor:
     state_class: measurement
     accuracy_decimals: 0
     entity_category: diagnostic
+  # Puissance reelle, en lecture seule, valable dans les deux modes de regulation
+  - platform: template
+    id: power_level
+    name: "Puissance"
+    icon: mdi:fire
+    state_class: measurement
+    accuracy_decimals: 0
   - platform: template
     id: profile
     name: "Profil"
@@ -580,7 +602,10 @@ binary_sensor:
     entity_category: diagnostic
     lambda: 'return id(last_reply) != 0 && millis() - id(last_reply) < 60000;'
 
-# Thermostat : regroupe la marche/arret, la consigne et la temperature ambiante.
+# Thermostat : regroupe la marche/arret, la consigne, la temperature ambiante et le
+# mode de regulation (prereglages Manuel / Automatique, parametre 40).
+#   Automatique : le poele module sa puissance selon la consigne
+#   Manuel      : le poele fonctionne a la puissance choisie, la consigne est sans effet
 # L'etat affiche vient uniquement du poele (optimistic: false) et rien n'est envoye au demarrage.
 climate:
   - platform: template
@@ -590,6 +615,7 @@ climate:
     sensor: ambient_temp
     supported_modes: [ "OFF", "HEAT" ]
     supports_action: true
+    custom_presets: [ "Manuel", "Automatique" ]
     optimistic: false
     restore_mode: NO_RESTORE
     visual:
@@ -603,6 +629,10 @@ climate:
       - lambda: |-
           if (x == climate::CLIMATE_MODE_HEAT) id(mcz_write).execute(34, 1);
           else if (x == climate::CLIMATE_MODE_OFF) id(mcz_write).execute(34, 40);
+    # Parametre 40 : 0 = manuel, 1 = automatique
+    set_custom_preset_action:
+      - lambda: |-
+          id(mcz_write).execute(40, x == "Automatique" ? 1 : 0);
     # Parametre 42 : consigne x 2
     set_target_temperature_action:
       - lambda: |-
@@ -741,19 +771,23 @@ number:
           id: mcz_write
           param: 42
           value: !lambda 'return (int) (x * 2);'
-  # Puissance 1 a 5 : le parametre 36 prend les valeurs 11 a 15, en lecture comme en ecriture
+  # Reglage de la puissance, utile en mode manuel seulement. En mode automatique le poele
+  # module seul sa puissance : l'ecriture est ignoree.
+  # Le parametre 36 prend les valeurs 11 a 15 pour les puissances 1 a 5.
   - platform: template
     id: num_power
-    name: "Puissance"
+    name: "Puissance (réglage)"
     icon: mdi:fire
     min_value: 1
     max_value: 5
     step: 1
     set_action:
-      - script.execute:
-          id: mcz_write
-          param: 36
-          value: !lambda 'return (int) x + 10;'
+      - lambda: |-
+          if (id(control_mode) == 1) {
+            ESP_LOGW("mcz", "Reglage de puissance ignore : le poele est en mode automatique");
+            return;
+          }
+          id(mcz_write).execute(36, (int) x + 10);
 
 button:
   - platform: template
