@@ -288,8 +288,13 @@ interval:
                                    : climate::CLIMATE_ACTION_OFF;
               id(stove_alarm).publish_state(st >= 50 && st <= 67);
             }
-            if (has(2))  id(num_fan).publish_state(num(2));
-            if (has(3))  id(num_ducted1).publish_state(num(3));
+            // Ventilations : 0 = No Air (arret), 1 a 5 = vitesse manuelle, 6 = automatique
+            auto fan_option = [](int v) -> const char * {
+              static const char *const OPTS[] = {"No Air", "1", "2", "3", "4", "5", "Automatique"};
+              return (v >= 0 && v <= 6) ? OPTS[v] : nullptr;
+            };
+            if (has(2)) { const char *o = fan_option((int) num(2)); if (o) id(sel_fan).publish_state(o); }
+            if (has(3)) { const char *o = fan_option((int) num(3)); if (o) id(sel_ducted1).publish_state(o); }
             if (has(5))  id(fume_temp).publish_state(num(5));
             if (has(6))  id(ambient_temp).publish_state(num(6) / 2.0f);
             if (has(12)) id(fume_fan_rpm).publish_state(num(12));
@@ -308,7 +313,7 @@ interval:
             if (has(17)) id(brazier_dirty).publish_state(num(17) != 0);
             if (has(18)) id(profile).publish_state(num(18));
             if (has(20)) id(sw_active).publish_state(num(20) != 0);
-            if (has(22)) {                       // mode de regulation : 0 = manuel, 1 = automatique (suppose)
+            if (has(22)) {                       // mode de regulation : 0 = manuel, 1 = automatique
               int cm = (int) num(22);
               if (cm == 0) id(sel_control_mode).publish_state("Manuel");
               else if (cm == 1) id(sel_control_mode).publish_state("Automatique");
@@ -674,8 +679,7 @@ switch:
 # Mode de regulation : parametre 40.
 #   Manuel      : le poele fonctionne a la puissance choisie (entite "Puissance")
 #   Automatique : le poele module sa puissance selon la consigne et la temperature ambiante
-# Correspondance supposee : 0 = manuel, 1 = automatique. Si elle est inversee, echanger
-# les deux valeurs ici et dans le decodage du champ 22.
+# Valeurs : 0 = manuel, 1 = automatique.
 select:
   - platform: template
     id: sel_control_mode
@@ -690,6 +694,36 @@ select:
           id: mcz_write
           param: 40
           value: !lambda 'return x == "Automatique" ? 1 : 0;'
+
+  # Ventilations : 0 = No Air (arret), 1 a 5 = vitesse manuelle, 6 = automatique
+  - platform: template
+    id: sel_fan
+    name: "Ventilation"
+    icon: mdi:fan
+    options: [ "No Air", "1", "2", "3", "4", "5", "Automatique" ]
+    optimistic: false
+    set_action:
+      - script.execute:
+          id: mcz_write
+          param: 37
+          value: !lambda |-
+            if (x == "No Air") return 0;
+            if (x == "Automatique") return 6;
+            return atoi(x.c_str());
+  - platform: template
+    id: sel_ducted1
+    name: "Ventilation canalisée"
+    icon: mdi:fan
+    options: [ "No Air", "1", "2", "3", "4", "5", "Automatique" ]
+    optimistic: false
+    set_action:
+      - script.execute:
+          id: mcz_write
+          param: 38
+          value: !lambda |-
+            if (x == "No Air") return 0;
+            if (x == "Automatique") return 6;
+            return atoi(x.c_str());
 
 number:
   # Consigne : parametre 42, valeur = temperature x 2
@@ -720,34 +754,6 @@ number:
           id: mcz_write
           param: 36
           value: !lambda 'return (int) x + 10;'
-  # Ventilation frontale : parametre 37. 1 a 5 = vitesse manuelle, 6 = automatique
-  - platform: template
-    id: num_fan
-    name: "Ventilation"
-    icon: mdi:fan
-    min_value: 0
-    max_value: 6
-    step: 1
-    set_action:
-      - script.execute:
-          id: mcz_write
-          param: 37
-          value: !lambda 'return (int) x;'
-
-  # Ventilation canalisee 1 : parametre 38, meme echelle que la ventilation frontale
-  # (1 a 5 = vitesse manuelle, 6 = automatique)
-  - platform: template
-    id: num_ducted1
-    name: "Ventilation canalisée"
-    icon: mdi:fan
-    min_value: 0
-    max_value: 6
-    step: 1
-    set_action:
-      - script.execute:
-          id: mcz_write
-          param: 38
-          value: !lambda 'return (int) x;'
 
 button:
   - platform: template

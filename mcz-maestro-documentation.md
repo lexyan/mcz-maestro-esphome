@@ -212,10 +212,10 @@ La carte mère ne vérifie pas le numéro de version (constaté à l'usage). Ell
 | 34 | Marche / arrêt | `1` = allumer, `40` = éteindre |
 | 42 | Consigne de température | température × 2 |
 | 36 | Puissance | `11` à `15` pour les puissances 1 à 5 |
-| 37 | Ventilation frontale | 1 à 5 = vitesse manuelle, `6` = automatique |
-| 38 | Ventilation canalisée 1 | 1 à 5 = vitesse manuelle, `6` = automatique |
+| 37 | Ventilation frontale | `0` = arrêt (« No Air »), 1 à 5 = vitesse manuelle, `6` = automatique |
+| 38 | Ventilation canalisée 1 | `0` = arrêt (« No Air »), 1 à 5 = vitesse manuelle, `6` = automatique |
 | 35 | Mode Active | 0 / 1 |
-| 40 | Mode de régulation | `0` = manuel, `1` = automatique (supposé) |
+| 40 | Mode de régulation | `0` = manuel, `1` = automatique |
 | 41 | Mode éco | 0 / 1 |
 | 45 | Mode silencieux | 0 / 1 |
 | 50 | Sons | 0 / 1 |
@@ -227,8 +227,8 @@ La carte mère ne vérifie pas le numéro de version (constaté à l'usage). Ell
 | Champ | Contenu | Conversion |
 |---|---|---|
 | 1 | État du poêle | code (voir ci-dessous) |
-| 2 | Ventilation frontale | 1 à 5 = vitesse manuelle, 6 = automatique |
-| 3 | Ventilation canalisée 1 | 1 à 5 = vitesse manuelle, 6 = automatique |
+| 2 | Ventilation frontale | 0 = arrêt (« No Air »), 1 à 5 = vitesse manuelle, 6 = automatique |
+| 3 | Ventilation canalisée 1 | 0 = arrêt (« No Air »), 1 à 5 = vitesse manuelle, 6 = automatique |
 | 5 | Température des fumées | °C |
 | 6 | Température ambiante | ÷ 2 |
 | 10 | Bougie | 0 = éteinte |
@@ -240,7 +240,7 @@ La carte mère ne vérifie pas le numéro de version (constaté à l'usage). Ell
 | 18 | Profil | code |
 | 20 | Mode Active | 0 / 1 |
 | 21 | Active, mesure | sans unité |
-| 22 | Mode de régulation | 0 = manuel, 1 = automatique (supposé) |
+| 22 | Mode de régulation | 0 = manuel, 1 = automatique |
 | 23 | Mode éco | 0 / 1 |
 | 24 | Mode silencieux | 0 / 1 |
 | 25 | Chronothermostat | 0 / 1 |
@@ -482,8 +482,8 @@ Secrets attendus dans `secrets.yaml` : `wifi_ssid`, `wifi_password`, `esphome_en
 | Consigne | Nombre, 5 à 35 °C par pas de 0,5 | 42 |
 | Mode de régulation | Liste : Manuel / Automatique | 40 |
 | Puissance | Nombre, 1 à 5 (envoyé comme 11 à 15) | 36 |
-| Ventilation | Nombre, 0 à 6 (6 = automatique) | 37 |
-| Ventilation canalisée | Nombre, 0 à 6 (6 = automatique) | 38 |
+| Ventilation | Liste : No Air / 1 à 5 / Automatique | 37 |
+| Ventilation canalisée | Liste : No Air / 1 à 5 / Automatique | 38 |
 | Mode éco | Interrupteur | 41 |
 | Mode silencieux | Interrupteur | 45 |
 | Mode Active | Interrupteur | 35 |
@@ -534,7 +534,7 @@ Le poêle a deux modes de fonctionnement :
 - **Manuel** : il fonctionne à la puissance choisie (entité « Puissance »).
 - **Automatique** : il module lui-même sa puissance selon la consigne et la température ambiante.
 
-L'entité « Mode de régulation » lit le champ 22 et écrit le paramètre 40.
+L'entité « Mode de régulation » lit le champ 22 et écrit le paramètre 40 (0 = manuel, 1 = automatique).
 
 ### Action `send_command`
 
@@ -563,11 +563,6 @@ Elle remplace la sonde d'ambiance déportée par un capteur de Home Assistant.
 - **Aucune commande au démarrage.** Les interrupteurs de commande n'envoient rien tant qu'ils ne sont pas actionnés ; leur état vient uniquement de ce que le poêle renvoie. Dans ESPHome, un interrupteur se remet par défaut à « éteint » au démarrage et exécute son action d'extinction : sans ce réglage (`restore_mode: DISABLED`), le module envoyait six écritures à chaque démarrage, ce qui a mis le poêle en route lors d'un essai.
 - **Garde-fou.** Toute écriture est ignorée pendant les 20 premières secondes après le démarrage.
 - **Pas d'écriture en flash.** Les préférences ne sont jamais écrites en flash (`flash_write_interval: never`).
-
-### Points restant à confirmer
-
-- La correspondance du mode de régulation (0 = manuel, 1 = automatique) est supposée.
-- Le sens de la valeur 0 des ventilations n'est pas confirmé.
 
 ---
 
