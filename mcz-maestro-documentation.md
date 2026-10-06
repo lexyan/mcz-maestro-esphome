@@ -91,12 +91,12 @@ Les dumps contiennent aussi des restes du firmware AT Espressif d'usine, inutili
 **Trame envoyée.**
 
 ```
-C|RecuperaTemperaturaWiFi|51|<T>|<version>|<champ5>|<qualité>
+C|RecuperaTemperaturaWiFi|<sonde>|<T>|<version>|<champ5>|<qualité>
 ```
 
 | Champ | Valeur | Origine |
 |---|---|---|
-| `51` | constante | Codée en dur |
+| `<sonde>` | `51`, `52` ou `53` | Numéro de la sonde : `51` = sonde 1, `52` = sonde 2, `53` = sonde 3. Le firmware étudié envoie `51`, codé en dur |
 | `<T>` | température × 2, entier | 21,5 °C donne `43` |
 | `<version>` | `1.3.1` | Version du firmware de la sonde |
 | `<champ5>` | `00` | Jamais modifié ; rôle inconnu |
@@ -202,7 +202,7 @@ La carte mère ne vérifie pas le numéro de version (constaté à l'usage). Ell
 | `C\|RecuperoInfo` | Demande la trame d'information (type `01`) |
 | `C\|WriteParametri\|<n°>\|<valeur>` | Écrit un paramètre |
 | `C\|SalvaDataOra\|jjmmaaaaHHMM` | Règle la date et l'heure |
-| `C\|RecuperaTemperaturaWiFi\|51\|…` | Température d'une sonde WiFi (voir 2.1) |
+| `C\|RecuperaTemperaturaWiFi\|<sonde>\|…` | Température d'une sonde WiFi, `<sonde>` valant 51, 52 ou 53 pour les sondes 1 à 3 (voir 2.1) |
 | `C\|WriteBancaDati\|356\|1\|FF` | Envoyée par la sonde à son premier contact |
 | `CambioBaudSerial` | Changement de vitesse série |
 | `RecuperoSerialeIP` | Numéro de série et adresse du serveur distant |
@@ -556,7 +556,7 @@ data:
 
 Elle remplace la sonde d'ambiance déportée par un capteur de Home Assistant.
 
-- Trame envoyée : `C|RecuperaTemperaturaWiFi|51|<T × 2>|<version>|00|<qualité WiFi>`.
+- Trame envoyée : `C|RecuperaTemperaturaWiFi|51|<T × 2>|<version>|00|<qualité WiFi>`. Le `51` désigne la sonde 1 ; les sondes 2 et 3 utiliseraient `52` et `53`.
 - La température est arrondie au demi-degré le plus proche (23,3 °C est envoyé comme 23,5 °C), ce qui évite le biais vers le bas d'une troncature.
 - Premier envoi 30 secondes après le démarrage, puis à l'intervalle renvoyé par le poêle, borné entre 1 et 30 minutes.
 - Aucun envoi si le capteur est indisponible ou si Home Assistant est injoignable.

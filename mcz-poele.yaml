@@ -154,6 +154,7 @@ interval:
 
   # Sonde virtuelle : envoie la temperature de Home Assistant a la place de la sonde WiFi.
   # Meme trame que la sonde d'origine : C|RecuperaTemperaturaWiFi|51|<T x 2>|1.9.9|00|<qualite WiFi>
+  # Le 51 designe la sonde 1 ; les sondes 2 et 3 utilisent 52 et 53.
   - interval: 10s
     then:
       - if:

@@ -93,12 +93,12 @@ The dumps also contain unused leftovers of the factory Espressif AT firmware.
 **Frame sent.**
 
 ```
-C|RecuperaTemperaturaWiFi|51|<T>|<version>|<field5>|<quality>
+C|RecuperaTemperaturaWiFi|<probe>|<T>|<version>|<field5>|<quality>
 ```
 
 | Field | Value | Origin |
 |---|---|---|
-| `51` | constant | Hard-coded |
+| `<probe>` | `51`, `52` or `53` | Probe number: `51` = probe 1, `52` = probe 2, `53` = probe 3. The firmware studied sends `51`, hard-coded |
 | `<T>` | temperature × 2, integer | 21.5 °C gives `43` |
 | `<version>` | `1.3.1` | Probe firmware version |
 | `<field5>` | `00` | Never modified; role unknown |
@@ -204,7 +204,7 @@ The mainboard does not check the version number (observed in use). It only works
 | `C\|RecuperoInfo` | Requests the information frame (type `01`) |
 | `C\|WriteParametri\|<no.>\|<value>` | Writes a parameter |
 | `C\|SalvaDataOra\|ddmmyyyyHHMM` | Sets the date and time |
-| `C\|RecuperaTemperaturaWiFi\|51\|…` | Temperature from a WiFi probe (see 2.1) |
+| `C\|RecuperaTemperaturaWiFi\|<probe>\|…` | Temperature from a WiFi probe, `<probe>` being 51, 52 or 53 for probes 1 to 3 (see 2.1) |
 | `C\|WriteBancaDati\|356\|1\|FF` | Sent by the probe on its first contact |
 | `CambioBaudSerial` | Changes the serial speed |
 | `RecuperoSerialeIP` | Serial number and remote server address |
@@ -558,7 +558,7 @@ data:
 
 It replaces the remote room probe with a Home Assistant sensor.
 
-- Frame sent: `C|RecuperaTemperaturaWiFi|51|<T × 2>|<version>|00|<WiFi quality>`.
+- Frame sent: `C|RecuperaTemperaturaWiFi|51|<T × 2>|<version>|00|<WiFi quality>`. The `51` designates probe 1; probes 2 and 3 would use `52` and `53`.
 - The temperature is rounded to the nearest half degree (23.3 °C is sent as 23.5 °C), which avoids the downward bias of truncation.
 - First transmission 30 seconds after startup, then at the interval returned by the stove, bounded between 1 and 30 minutes.
 - Nothing is sent if the sensor is unavailable or if Home Assistant cannot be reached.
