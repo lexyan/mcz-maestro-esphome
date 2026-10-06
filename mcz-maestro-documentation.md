@@ -1,5 +1,7 @@
 # Poêle MCZ Maestro : modules WiFi, protocole et firmware ESPHome
 
+*[English version](mcz-maestro-documentation.en.md)*
+
 Ce document résume l'analyse des firmwares des modules WiFi d'un poêle à pellets MCZ (technologie Maestro) et leur remplacement par ESPHome pour un pilotage direct depuis Home Assistant.
 
 Il couvre :
