@@ -144,7 +144,7 @@ La carte mère ne vérifie pas le numéro de version (constaté à l'usage). Ell
 - Au démarrage, puis après 30 secondes sans trafic, envoi à la carte mère de `RispostaAccensioneDirect|<ssid>|<mot de passe>|1.2.4^`.
 - Toutes les 20 secondes, ping websocket des clients. Un client en `.51` à `.60` (plage des sondes) qui ne répond pas est déconnecté ; un client DHCP muet depuis 20 secondes provoque un redémarrage du module.
 - Vitesse série : 115200 bauds par défaut. La commande `CambioBaudSerial` permet 9600, 38400 ou 57600 ; la valeur est gardée en EEPROM.
-- LED : GPIO13 clignote à 1 Hz ; GPIO12 est mis à 0 au démarrage et n'est plus modifié.
+- LED : GPIO13 clignote à 1 Hz ; GPIO12 est mis à 0 au démarrage et n'est plus modifié, ce qui laisse sa LED allumée (elle est active à l'état bas).
 
 ### 2.3 Module WiFi 2 (cloud), firmware « MCZ-RemoteService » 1.2.5
 
@@ -163,7 +163,7 @@ La carte mère ne vérifie pas le numéro de version (constaté à l'usage). Ell
 - Ping socket.io toutes les 25 secondes. Redémarrage si le WiFi tombe.
 - Après 30 secondes sans message du serveur, nouvelle annonce série à la carte mère.
 - Vitesse série : même mécanisme que le module local, mémorisée à l'adresse EEPROM `0x46`.
-- LED : GPIO13 clignote pendant le portail de configuration puis suit l'état de la connexion ; GPIO12 est mis à 0 au démarrage.
+- LED : GPIO13 clignote pendant le portail de configuration puis suit l'état de la connexion ; GPIO12 est mis à 0 au démarrage, ce qui allume sa LED.
 
 **EEPROM.**
 
@@ -453,7 +453,7 @@ Secrets attendus dans `secrets.yaml` : `wifi_ssid`, `wifi_password`, `esphome_en
 | Liaison série | TX GPIO1, RX GPIO3, 115200 bauds |
 | Logs série | Désactivés (`baud_rate: 0`) |
 | LED d'état | GPIO13 |
-| LED GPIO12 | Mise à 0 au démarrage, non exposée dans Home Assistant |
+| LED GPIO12 | Active à l'état bas : mise à 0 au démarrage, donc allumée. Non exposée dans Home Assistant |
 
 ### Entités
 

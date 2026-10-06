@@ -698,7 +698,8 @@ switch:
     optimistic: true
     restore_mode: ALWAYS_ON     # active a chaque demarrage ; n'envoie rien par lui-meme
     entity_category: config
-  # LED sur GPIO12 : forcee a 0 au demarrage, comme dans le firmware d'origine.
+  # LED sur GPIO12, active a l'etat bas : la broche est forcee a 0 au demarrage, comme dans
+  # le firmware d'origine, ce qui allume la LED (temoin de fonctionnement).
   # Interne : non exposee dans Home Assistant.
   - platform: gpio
     pin: GPIO12
