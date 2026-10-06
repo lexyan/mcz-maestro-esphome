@@ -452,7 +452,7 @@ Secrets attendus dans `secrets.yaml` : `wifi_ssid`, `wifi_password`, `esphome_en
 | Carte | `esp_wroom_02` (ESP8266 générique, 2 Mo) |
 | Liaison série | TX GPIO1, RX GPIO3, 115200 bauds |
 | Logs série | Désactivés (`baud_rate: 0`) |
-| LED d'état | GPIO13 |
+| LED d'état | GPIO13, active à l'état bas. Éteinte en fonctionnement normal, clignotante en cas d'avertissement ou d'erreur |
 | LED GPIO12 | Active à l'état bas : mise à 0 au démarrage, donc allumée. Non exposée dans Home Assistant |
 
 ### Entités

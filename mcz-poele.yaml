@@ -83,8 +83,12 @@ uart:
   baud_rate: 115200
   rx_buffer_size: 1024
 
+# LED d'etat sur GPIO13, active a l'etat bas : eteinte en fonctionnement normal,
+# clignotante en cas d'avertissement ou d'erreur (WiFi ou Home Assistant injoignable)
 status_led:
-  pin: GPIO13
+  pin:
+    number: GPIO13
+    inverted: true
 
 globals:
   - id: rx_frame
