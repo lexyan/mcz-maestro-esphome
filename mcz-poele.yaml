@@ -698,13 +698,13 @@ switch:
     optimistic: true
     restore_mode: ALWAYS_ON     # active a chaque demarrage ; n'envoie rien par lui-meme
     entity_category: config
-  # LED sur GPIO12 : forcee a 0 au demarrage, comme dans le firmware d'origine
+  # LED sur GPIO12 : forcee a 0 au demarrage, comme dans le firmware d'origine.
+  # Interne : non exposee dans Home Assistant.
   - platform: gpio
     pin: GPIO12
     id: led_gpio12
-    name: "LED GPIO12"
+    internal: true
     restore_mode: ALWAYS_OFF
-    entity_category: config
 
 # Mode de regulation : parametre 40.
 #   Manuel      : le poele fonctionne a la puissance choisie (entite "Puissance")

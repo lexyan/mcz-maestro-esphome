@@ -453,7 +453,7 @@ Secrets attendus dans `secrets.yaml` : `wifi_ssid`, `wifi_password`, `esphome_en
 | Liaison série | TX GPIO1, RX GPIO3, 115200 bauds |
 | Logs série | Désactivés (`baud_rate: 0`) |
 | LED d'état | GPIO13 |
-| LED GPIO12 | Mise à 0 au démarrage, exposée comme interrupteur |
+| LED GPIO12 | Mise à 0 au démarrage, non exposée dans Home Assistant |
 
 ### Entités
 
@@ -491,7 +491,6 @@ Secrets attendus dans `secrets.yaml` : `wifi_ssid`, `wifi_password`, `esphome_en
 |---|---|
 | Sons | Interrupteur |
 | Sonde virtuelle | Interrupteur |
-| LED GPIO12 | Interrupteur |
 | Régler l'heure du poêle | Bouton |
 
 **Diagnostic**
