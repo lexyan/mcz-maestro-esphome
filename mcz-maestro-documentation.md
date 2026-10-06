@@ -211,9 +211,9 @@ La carte mère ne vérifie pas le numéro de version (constaté à l'usage). Ell
 |---|---|---|
 | 34 | Marche / arrêt | `1` = allumer, `40` = éteindre |
 | 42 | Consigne de température | température × 2 |
-| 36 | Puissance | 1 à 5 |
-| 37 | Ventilation frontale | 0 à 6 |
-| 38 | Ventilation canalisée 1 | 0 à 6 |
+| 36 | Puissance | `11` à `15` pour les puissances 1 à 5 |
+| 37 | Ventilation frontale | 1 à 5 = vitesse manuelle, `6` = automatique |
+| 38 | Ventilation canalisée 1 | 1 à 5 = vitesse manuelle, `6` = automatique |
 | 35 | Mode Active | 0 / 1 |
 | 40 | Mode de régulation | `0` = manuel, `1` = automatique (supposé) |
 | 41 | Mode éco | 0 / 1 |
@@ -227,19 +227,19 @@ La carte mère ne vérifie pas le numéro de version (constaté à l'usage). Ell
 | Champ | Contenu | Conversion |
 |---|---|---|
 | 1 | État du poêle | code (voir ci-dessous) |
-| 2 | Ventilation frontale | 0 à 6 |
-| 3 | Ventilation canalisée 1 | 0 à 6 |
+| 2 | Ventilation frontale | 1 à 5 = vitesse manuelle, 6 = automatique |
+| 3 | Ventilation canalisée 1 | 1 à 5 = vitesse manuelle, 6 = automatique |
 | 5 | Température des fumées | °C |
 | 6 | Température ambiante | ÷ 2 |
 | 10 | Bougie | 0 = éteinte |
-| 11 | Active, consigne | brut, unité inconnue |
+| 11 | Active, consigne | sans unité |
 | 12 | Extracteur de fumées | tr/min |
 | 13 | Vis sans fin, consigne | tr/min |
 | 14 | Vis sans fin, réelle | tr/min |
 | 17 | Brasier | 0 = propre |
 | 18 | Profil | code |
 | 20 | Mode Active | 0 / 1 |
-| 21 | Active, mesure | brut, unité inconnue |
+| 21 | Active, mesure | sans unité |
 | 22 | Mode de régulation | 0 = manuel, 1 = automatique (supposé) |
 | 23 | Mode éco | 0 / 1 |
 | 24 | Mode silencieux | 0 / 1 |
@@ -253,9 +253,9 @@ La carte mère ne vérifie pas le numéro de version (constaté à l'usage). Ell
 | 38 – 42 | Durée en puissance 1 à 5 | secondes |
 | 43 | Heures avant entretien | heures |
 | 45 | Nombre d'allumages | |
-| 46 | Active, température | brut |
+| 46 | Active, température | sans unité |
 | 49 | Sons | 0 / 1 |
-| 52 | Température de la sonde WiFi 1 | ÷ 2 (supposé) |
+| 52 | Température de la sonde WiFi 1 | ÷ 2 |
 
 ### États du poêle
 
@@ -481,9 +481,9 @@ Secrets attendus dans `secrets.yaml` : `wifi_ssid`, `wifi_password`, `esphome_en
 | Marche | Interrupteur | 34 |
 | Consigne | Nombre, 5 à 35 °C par pas de 0,5 | 42 |
 | Mode de régulation | Liste : Manuel / Automatique | 40 |
-| Puissance | Nombre, 1 à 5 | 36 |
-| Ventilation | Nombre, 0 à 6 | 37 |
-| Ventilation canalisée | Nombre, 0 à 6 | 38 |
+| Puissance | Nombre, 1 à 5 (envoyé comme 11 à 15) | 36 |
+| Ventilation | Nombre, 0 à 6 (6 = automatique) | 37 |
+| Ventilation canalisée | Nombre, 0 à 6 (6 = automatique) | 38 |
 | Mode éco | Interrupteur | 41 |
 | Mode silencieux | Interrupteur | 45 |
 | Mode Active | Interrupteur | 35 |
@@ -556,6 +556,7 @@ Elle remplace la sonde d'ambiance déportée par un capteur de Home Assistant.
 - Aucun envoi si le capteur est indisponible ou si Home Assistant est injoignable.
 - L'interrupteur « Sonde virtuelle » est actif à chaque démarrage.
 - Éteindre la sonde d'origine, sinon les deux envoient chacune leur température.
+- Si la sonde virtuelle cesse d'envoyer des températures valides, le poêle repasse automatiquement en mode manuel et l'application affiche « sonde wifi déconnectée ».
 
 ### Sécurités
 
@@ -565,12 +566,8 @@ Elle remplace la sonde d'ambiance déportée par un capteur de Home Assistant.
 
 ### Points restant à confirmer
 
-- L'écriture de la puissance envoie 1 à 5, alors que la lecture renvoie 11 à 15. Si le réglage reste sans effet, ajouter 10 à l'envoi.
 - La correspondance du mode de régulation (0 = manuel, 1 = automatique) est supposée.
-- L'unité des trois valeurs « Active » n'est pas connue.
-- Le sens de la valeur 6 des ventilations (mode automatique ?) n'est pas documenté.
-- L'échelle du champ 52 (sonde WiFi relue par le poêle) est supposée en demi-degrés.
-- Le comportement de la carte mère quand la sonde virtuelle cesse d'émettre n'a pas été observé.
+- Le sens de la valeur 0 des ventilations n'est pas confirmé.
 
 ---
 

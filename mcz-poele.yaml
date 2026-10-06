@@ -419,7 +419,7 @@ sensor:
     state_class: measurement
     accuracy_decimals: 0
     entity_category: diagnostic
-  # Valeurs brutes : l'unite des champs Active n'est pas documentee
+  # Les valeurs Active sont sans unite
   - platform: template
     id: active_set
     name: "Active (consigne)"
@@ -707,6 +707,7 @@ number:
           id: mcz_write
           param: 42
           value: !lambda 'return (int) (x * 2);'
+  # Puissance 1 a 5 : le parametre 36 prend les valeurs 11 a 15, en lecture comme en ecriture
   - platform: template
     id: num_power
     name: "Puissance"
@@ -718,7 +719,8 @@ number:
       - script.execute:
           id: mcz_write
           param: 36
-          value: !lambda 'return (int) x;'
+          value: !lambda 'return (int) x + 10;'
+  # Ventilation frontale : parametre 37. 1 a 5 = vitesse manuelle, 6 = automatique
   - platform: template
     id: num_fan
     name: "Ventilation"
@@ -733,6 +735,7 @@ number:
           value: !lambda 'return (int) x;'
 
   # Ventilation canalisee 1 : parametre 38, meme echelle que la ventilation frontale
+  # (1 a 5 = vitesse manuelle, 6 = automatique)
   - platform: template
     id: num_ducted1
     name: "Ventilation canalisée"
