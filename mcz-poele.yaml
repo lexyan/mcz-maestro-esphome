@@ -308,6 +308,12 @@ interval:
             if (has(17)) id(brazier_dirty).publish_state(num(17) != 0);
             if (has(18)) id(profile).publish_state(num(18));
             if (has(20)) id(sw_active).publish_state(num(20) != 0);
+            if (has(22)) {                       // mode de regulation : 0 = manuel, 1 = automatique (suppose)
+              int cm = (int) num(22);
+              if (cm == 0) id(sel_control_mode).publish_state("Manuel");
+              else if (cm == 1) id(sel_control_mode).publish_state("Automatique");
+              else ESP_LOGW("mcz", "Mode de regulation inconnu : %d", cm);
+            }
             if (has(23)) id(sw_eco).publish_state(num(23) != 0);
             if (has(24)) id(sw_silent).publish_state(num(24) != 0);
             if (has(25)) id(sw_chrono).publish_state(num(25) != 0);
@@ -664,6 +670,26 @@ switch:
     name: "LED GPIO12"
     restore_mode: ALWAYS_OFF
     entity_category: config
+
+# Mode de regulation : parametre 40.
+#   Manuel      : le poele fonctionne a la puissance choisie (entite "Puissance")
+#   Automatique : le poele module sa puissance selon la consigne et la temperature ambiante
+# Correspondance supposee : 0 = manuel, 1 = automatique. Si elle est inversee, echanger
+# les deux valeurs ici et dans le decodage du champ 22.
+select:
+  - platform: template
+    id: sel_control_mode
+    name: "Mode de régulation"
+    icon: mdi:tune-variant
+    options:
+      - "Manuel"
+      - "Automatique"
+    optimistic: false
+    set_action:
+      - script.execute:
+          id: mcz_write
+          param: 40
+          value: !lambda 'return x == "Automatique" ? 1 : 0;'
 
 number:
   # Consigne : parametre 42, valeur = temperature x 2

@@ -215,6 +215,7 @@ La carte mère ne vérifie pas le numéro de version (constaté à l'usage). Ell
 | 37 | Ventilation frontale | 0 à 6 |
 | 38 | Ventilation canalisée 1 | 0 à 6 |
 | 35 | Mode Active | 0 / 1 |
+| 40 | Mode de régulation | `0` = manuel, `1` = automatique (supposé) |
 | 41 | Mode éco | 0 / 1 |
 | 45 | Mode silencieux | 0 / 1 |
 | 50 | Sons | 0 / 1 |
@@ -239,6 +240,7 @@ La carte mère ne vérifie pas le numéro de version (constaté à l'usage). Ell
 | 18 | Profil | code |
 | 20 | Mode Active | 0 / 1 |
 | 21 | Active, mesure | brut, unité inconnue |
+| 22 | Mode de régulation | 0 = manuel, 1 = automatique (supposé) |
 | 23 | Mode éco | 0 / 1 |
 | 24 | Mode silencieux | 0 / 1 |
 | 25 | Chronothermostat | 0 / 1 |
@@ -478,6 +480,7 @@ Secrets attendus dans `secrets.yaml` : `wifi_ssid`, `wifi_password`, `esphome_en
 | Thermostat | Climat (arrêt / chauffage, consigne, température ambiante) | 34 et 42 |
 | Marche | Interrupteur | 34 |
 | Consigne | Nombre, 5 à 35 °C par pas de 0,5 | 42 |
+| Mode de régulation | Liste : Manuel / Automatique | 40 |
 | Puissance | Nombre, 1 à 5 | 36 |
 | Ventilation | Nombre, 0 à 6 | 37 |
 | Ventilation canalisée | Nombre, 0 à 6 | 38 |
@@ -524,6 +527,15 @@ L'entité « Thermostat » regroupe la marche/arrêt, la consigne et la tempéra
 - L'état affiché vient uniquement de ce que le poêle renvoie. Après une commande, il se met à jour à la trame d'information suivante.
 - Les entités « Marche » et « Consigne » restent disponibles séparément.
 
+### Mode de régulation
+
+Le poêle a deux modes de fonctionnement :
+
+- **Manuel** : il fonctionne à la puissance choisie (entité « Puissance »).
+- **Automatique** : il module lui-même sa puissance selon la consigne et la température ambiante.
+
+L'entité « Mode de régulation » lit le champ 22 et écrit le paramètre 40.
+
 ### Action `send_command`
 
 Envoie une trame brute depuis Home Assistant, sans le `^` final. Utile pour tester une commande non prévue.
@@ -554,6 +566,7 @@ Elle remplace la sonde d'ambiance déportée par un capteur de Home Assistant.
 ### Points restant à confirmer
 
 - L'écriture de la puissance envoie 1 à 5, alors que la lecture renvoie 11 à 15. Si le réglage reste sans effet, ajouter 10 à l'envoi.
+- La correspondance du mode de régulation (0 = manuel, 1 = automatique) est supposée.
 - L'unité des trois valeurs « Active » n'est pas connue.
 - Le sens de la valeur 6 des ventilations (mode automatique ?) n'est pas documenté.
 - L'échelle du champ 52 (sonde WiFi relue par le poêle) est supposée en demi-degrés.
