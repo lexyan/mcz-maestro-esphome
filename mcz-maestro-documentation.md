@@ -310,10 +310,9 @@ Les autres broches, dont celles par lesquelles la carte mère commande l'aliment
 
 *Figure 1 — Connecteur du module WiFi, côté soudures et côté embase : TX et RX des deux modules, masse et position de la broche 1.*
 
-<!-- IMAGE : vue d'ensemble de la carte, avec les deux modules, le regulateur AMS1117 et les transistors reperes -->
-![Vue d'ensemble de la carte WiFi](images/carte-vue-ensemble.jpg)
+![Vue d'ensemble de la carte WiFi](images/carte-vue-ensemble.png)
 
-*Figure 2 — Carte WiFi : module 1 (local), module 2 (cloud), régulateur et transistors d'alimentation.*
+*Figure 2 — Carte WiFi, les deux faces. Côté composants : module 1 (« Local », repère `J3 WIFI1`) et module 2 (« Cloud », repère `J5 WIFI2`). Côté opposé : l'embase du connecteur vers la carte mère.*
 
 ### Vias d'alimentation
 
