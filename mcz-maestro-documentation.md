@@ -293,7 +293,7 @@ Conséquence pour la reprogrammation : **le +5 V du connecteur n'est pas utilis�
 
 ### Connecteur du module WiFi
 
-Le connecteur est une embase à deux rangées. La broche 1 est du côté du module WiFi 2 (repère `J5 WIFI2` sur la carte). Les broches impaires sont sur une rangée, les broches paires sur l'autre.
+Le connecteur est une embase à deux rangées. La broche 1 est du côté du module WiFi 2 et des 2 LED (repère `J5 WIFI2` sur la carte). Les broches impaires sont sur une rangée, les broches paires sur l'autre.
 
 | Broche | Signal | Module | Utilisée pour la programmation |
 |---|---|---|---|
