@@ -355,11 +355,6 @@ Pour reprogrammer le **module WiFi 2 (cloud)** :
 
 Pour le module WiFi 1 (local), utiliser la broche 1 (TX), la broche 2 (RX) et le via d'alimentation du module 1.
 
-<!-- IMAGE : montage complet, carte reliee a l'adaptateur USB-serie, fil 3,3 V sur le via -->
-![Câblage vers l'adaptateur USB-série](images/cablage-adaptateur.jpg)
-
-*Figure 5 — Câblage complet pour la reprogrammation du module 2.*
-
 **Précautions.**
 
 - Débrancher la carte du poêle avant de la relier à l'adaptateur.
