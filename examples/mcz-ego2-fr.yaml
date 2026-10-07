@@ -185,6 +185,8 @@ switch:
       name: "Mode Active"
     chronothermostat:
       name: "Chronothermostat"
+    summer_mode:
+      name: "Mode été"
     sounds:
       name: "Sons"
     virtual_probe:

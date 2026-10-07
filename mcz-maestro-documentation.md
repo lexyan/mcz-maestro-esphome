@@ -608,7 +608,7 @@ Ces entités concernent les poêles hydro, le ballon, la 2ᵉ canalisation et le
 | `text_sensor` | `pellet_level` | Niveau de pellets en clair | 47 | |
 | `binary_sensor` | `pellet_empty` | Réservoir de pellets vide | 47 | |
 | `switch` | `pellet_sensor` | Capteur de pellets | 47 | 148 |
-| `switch` | `summer_mode` | Mode été, sans relecture | | 58 |
+| `switch` | `summer_mode` | Mode été / hiver : 1 = été, 0 = hiver | 51 | 58 |
 | `number` | `chrono_t1` à `chrono_t3` | Températures du chronothermostat, sans relecture | | 1108 à 1110 |
 | `number` | `profile` | Profil, valeur brute | 18 | 149 |
 | `number` | `temperature_unit` | Unité de température, valeur brute | 48 | 49 |

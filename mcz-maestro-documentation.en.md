@@ -609,7 +609,7 @@ These entities are for hydro stoves, the boiler, the second ducted fan and the p
 | `text_sensor` | `pellet_level` | Pellet level in plain text | 47 | |
 | `binary_sensor` | `pellet_empty` | Pellet tank empty | 47 | |
 | `switch` | `pellet_sensor` | Pellet sensor | 47 | 148 |
-| `switch` | `summer_mode` | Summer mode, no read-back | | 58 |
+| `switch` | `summer_mode` | Summer / winter mode: 1 = summer, 0 = winter | 51 | 58 |
 | `number` | `chrono_t1` to `chrono_t3` | Chronothermostat temperatures, no read-back | | 1108 to 1110 |
 | `number` | `profile` | Profile, raw value | 18 | 149 |
 | `number` | `temperature_unit` | Temperature unit, raw value | 48 | 49 |
