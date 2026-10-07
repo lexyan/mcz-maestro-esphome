@@ -47,9 +47,20 @@ SELECTS = {
     "ducted_fan_2": (39, 4, _schema(FAN_OPTIONS, "mdi:fan")),
 }
 
+# Combustion recipes ("Ricetta Aria" / "Ricetta Pellet" in the MCZ app). They are read
+# with C|RecuperoParametriExtra|11 and written to the stove's parameter database.
+AIR_RECIPE_OPTIONS = {0: "-2", 1: "-1", 2: "0", 3: "+1", 4: "+2"}
+PELLET_RECIPE_OPTIONS = {0: "-3", 1: "-2", 2: "-1", 3: "0", 4: "+1", 5: "+2", 6: "+3"}
+
+# key: (database cell written, index in the extra parameters, schema)
+RECIPE_SELECTS = {
+    "air_recipe": (459, 0, _schema(AIR_RECIPE_OPTIONS, "mdi:weather-windy")),
+    "pellet_recipe": (460, 1, _schema(PELLET_RECIPE_OPTIONS, "mdi:grain")),
+}
+
 CONFIG_SCHEMA = HUB_CHILD_SCHEMA.extend(
     {cv.Optional(key): item[2] for key, item in SELECTS.items()}
-)
+).extend({cv.Optional(key): item[2] for key, item in RECIPE_SELECTS.items()})
 
 
 async def to_code(config):
@@ -63,3 +74,12 @@ async def to_code(config):
             cg.add(var.set_field(field))
             cg.add(var.set_mappings(list(options.keys())))
             cg.add(parent.register_listener(var))
+    for key, (cell, index, _) in RECIPE_SELECTS.items():
+        if conf := config.get(key):
+            options = conf[CONF_OPTIONS]
+            var = await select.new_select(conf, options=list(options.values()))
+            cg.add(var.set_parent(parent))
+            cg.add(var.set_extra(index, cell))
+            cg.add(var.set_mappings(list(options.keys())))
+            cg.add(parent.register_listener(var))
+            cg.add(parent.set_extra_enabled(True))

@@ -657,6 +657,32 @@ La puissance est exposée par deux entités :
 
 Pour n'afficher que les commandes utiles, on peut conditionner la visibilité des cartes du tableau de bord à l'état de la liste `control_mode` : thermostat et capteur de puissance en automatique, réglage de puissance en manuel.
 
+### Recettes air et pellets
+
+Les recettes (« Ricetta Aria » et « Ricetta Pellet » dans l'application MCZ) corrigent le dosage de l'air de combustion et des pellets. Elles s'exposent par deux listes (`select`) :
+
+| Clé | Contenu | Valeurs | Cellule écrite |
+|---|---|---|---|
+| `air_recipe` | Recette air | 0 à 4, affichées -2 à +2 | 459 |
+| `pellet_recipe` | Recette pellets | 0 à 6, affichées -3 à +3 | 460 |
+
+```yaml
+select:
+  - platform: mcz_maestro
+    air_recipe:
+      name: "Recette air"
+    pellet_recipe:
+      name: "Recette pellets"
+```
+
+- Lecture : `C|RecuperoParametriExtra|11`, envoyée au démarrage, après une écriture, puis toutes les 10 minutes. La réponse est une trame de type `03`, en hexadécimal : `03|<air>|<pellets>|<entrée ambiance>|<délai éco-stop>|<hystérésis>`.
+- Écriture : `C|WriteBancaDati|<cellule>|1|<valeur sur 2 chiffres hexadécimaux>`. Exemple : `C|WriteBancaDati|459|1|03` règle la recette air sur +1.
+- Ces commandes ne sont envoyées que si l'une des deux listes est déclarée.
+- Une recette est écrite dans la banque de données du poêle, c'est-à-dire ses paramètres, probablement en mémoire permanente : la modifier à la main, pas depuis une automatisation répétitive.
+- Les libellés se traduisent avec `options`, comme pour les autres listes.
+- Dans une lambda, `write_database(cellule, octets, valeur)` écrit une cellule de la banque de données.
+- Le format vient des sources de l'application MCZ ; il **n'a pas encore été testé sur un poêle**.
+
 ### Trames brutes
 
 Le composant expose deux fonctions utilisables dans une lambda : `send_command("…")` envoie une trame brute, sans le `^` final, et `write_parameter(n°, valeur)` écrit un paramètre. Les exemples s'en servent pour offrir une action à Home Assistant, utile pour tester une commande non prévue :

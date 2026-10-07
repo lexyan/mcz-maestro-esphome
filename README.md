@@ -106,7 +106,7 @@ mcz_maestro:
 | `binary_sensor` | `alarm`, `brazier_dirty`, `igniter`, `link`, `pellet_empty` |
 | `text_sensor` | `state`, `datetime`, `firmware`, `valve_3way`, `pellet_level` |
 | `switch` | `power`, `eco_mode`, `silent_mode`, `active_mode`, `chronothermostat`, `sounds`, `virtual_probe`, `pellet_sensor`, `summer_mode` |
-| `select` | `control_mode`, `fan`, `ducted_fan_1`, `ducted_fan_2` |
+| `select` | `control_mode`, `fan`, `ducted_fan_1`, `ducted_fan_2`, `air_recipe`, `pellet_recipe` |
 | `number` | `setpoint`, `power`, `boiler_setpoint`, `chrono_t1` … `chrono_t3`, `profile`, `temperature_unit`, `sleep`, `antifreeze` |
 | `button` | `refresh`, `reset_alarm`, `set_time`, `reset_service`, `reset_active`, `load_auger` |
 
@@ -122,6 +122,10 @@ select:
 
 From a lambda, `id(stove).send_command("C|RecuperoInfo")` sends a raw frame and
 `id(stove).write_parameter(42, 43)` writes a parameter.
+
+`air_recipe` and `pellet_recipe` are the combustion recipes of the MCZ app (air -2 to +2,
+pellets -3 to +3). They are read with `C|RecuperoParametriExtra|11` and written to the
+stove's database with `C|WriteBancaDati` (cells 459 and 460); not tested on a stove yet.
 
 Complete configurations: [`examples/full.yaml`](examples/full.yaml) (every option)
 and [`examples/mcz-ego2-fr.yaml`](examples/mcz-ego2-fr.yaml) (the stove this was built on, in French).

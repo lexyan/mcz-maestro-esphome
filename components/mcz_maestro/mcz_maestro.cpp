@@ -25,6 +25,10 @@ static const uint32_t REPLY_TIMEOUT_MS = 2000;
 static const uint32_t LINK_TIMEOUT_MS = 60000;
 static const uint32_t PROBE_FIRST_SEND_MS = 30000;
 static const char *const INFO_COMMAND = "C|RecuperoInfo";
+static const char *const EXTRA_COMMAND = "C|RecuperoParametriExtra|11";
+// Extra parameters only change when written: they are read rarely
+static const uint32_t EXTRA_INTERVAL_MS = 600000;
+static const uint32_t EXTRA_RETRY_MS = 60000;
 static const char *const PROBE_COMMAND = "C|RecuperaTemperaturaWiFi|";
 static const size_t PROBE_COMMAND_LEN = 26;
 static const uint8_t PROBE_ID_BASE = 51;  // probes 1, 2 and 3 are sent as 51, 52 and 53
@@ -152,6 +156,8 @@ void MczMaestro::setup() {
     this->tx_queue_.emplace_back(buf);
   }
   this->request_info();
+  if (this->extra_enabled_)
+    this->request_extra();
   for (auto *listener : this->listeners_)
     listener->on_hub_setup();
 }
@@ -161,8 +167,10 @@ void MczMaestro::dump_config() {
                 "MCZ Maestro:\n"
                 "  Announce at start-up: %s\n"
                 "  Write guard: %u ms\n"
-                "  Listeners: %u",
-                YESNO(this->announce_), (unsigned) this->write_guard_ms_, (unsigned) this->listeners_.size());
+                "  Listeners: %u\n"
+                "  Extra parameters (recipes): %s",
+                YESNO(this->announce_), (unsigned) this->write_guard_ms_, (unsigned) this->listeners_.size(),
+                YESNO(this->extra_enabled_));
 #ifdef USE_SENSOR
   for (uint8_t i = 0; i < MCZ_MAX_PROBES; i++) {
     if (this->probes_[i].source != nullptr)
@@ -173,7 +181,14 @@ void MczMaestro::dump_config() {
   LOG_UPDATE_INTERVAL(this);
 }
 
-void MczMaestro::update() { this->request_info(); }
+void MczMaestro::update() {
+  this->request_info();
+  if (this->extra_enabled_) {
+    const uint32_t interval = this->extra_received_ ? EXTRA_INTERVAL_MS : EXTRA_RETRY_MS;
+    if (millis() - this->last_extra_request_ >= interval)
+      this->request_extra();
+  }
+}
 
 bool MczMaestro::is_linked() const {
   return this->last_reply_ != 0 && millis() - this->last_reply_ < LINK_TIMEOUT_MS;
@@ -186,6 +201,37 @@ void MczMaestro::request_info() {
       return;
   }
   this->send_command(INFO_COMMAND);
+}
+
+void MczMaestro::request_extra() {
+  this->last_extra_request_ = millis();
+  for (const auto &queued : this->tx_queue_) {
+    if (queued == EXTRA_COMMAND)
+      return;
+  }
+  this->send_command(EXTRA_COMMAND);
+}
+
+bool MczMaestro::write_database(uint16_t cell, uint8_t bytes, uint32_t value) {
+  // Safety: nothing is written to the stove right after boot
+  if (millis() < this->write_guard_ms_) {
+    ESP_LOGW(TAG, "Database write %u=%u ignored (start-up guard)", cell, (unsigned) value);
+    return false;
+  }
+  if (bytes != 1 && bytes != 2)
+    return false;
+  if (value > (bytes == 1 ? 0xFFu : 0xFFFFu)) {
+    ESP_LOGW(TAG, "Database write %u: value %u does not fit in %u byte(s)", cell, (unsigned) value, bytes);
+    return false;
+  }
+  char buf[48];
+  // Same format as the MCZ app: lower-case hexadecimal, 2 digits per byte
+  snprintf(buf, sizeof(buf), "C|WriteBancaDati|%u|%u|%0*x", cell, bytes, bytes * 2, (unsigned) value);
+  if (!this->send_command(buf))
+    return false;
+  // A single read-back follows the last write of a burst
+  this->extra_pending_ = true;
+  return true;
 }
 
 bool MczMaestro::send_command(const std::string &command) {
@@ -269,6 +315,10 @@ void MczMaestro::loop() {
       this->refresh_pending_ = false;
       this->request_info();
     }
+    if (this->tx_queue_.empty() && this->extra_pending_) {
+      this->extra_pending_ = false;
+      this->request_extra();
+    }
     if (!this->tx_queue_.empty())
       this->send_next_();
   }
@@ -342,7 +392,7 @@ void MczMaestro::handle_frame_() {
     return;
   }
 
-  // Only the information frame (type 01) is decoded
+  // Only the information frame (type 01) and the extra parameters (type 03) are decoded
   const bool after_write = this->last_was_write_;
   this->last_was_write_ = false;
   if (this->rx_.size() >= 3 && this->rx_[0] == '0' && this->rx_[1] == '1' && this->rx_[2] == '|') {
@@ -351,7 +401,33 @@ void MczMaestro::handle_frame_() {
     if (after_write && this->tx_queue_.empty())
       this->refresh_pending_ = false;
     this->handle_info_();
+  } else if (this->rx_.size() >= 3 && this->rx_[0] == '0' && this->rx_[1] == '3' && this->rx_[2] == '|') {
+    this->handle_extra_();
   }
+}
+
+void MczMaestro::handle_extra_() {
+  // 03|<air recipe>|<pellet recipe>|<room input>|<eco-stop delay>|<hysteresis>, in hexadecimal
+  MczExtra extra;
+  size_t start = 3;
+  const size_t len = this->rx_.size();
+  while (start < len && extra.count < MCZ_MAX_EXTRA) {
+    size_t end = this->rx_.find('|', start);
+    if (end == std::string::npos)
+      end = len;
+    char *stop = nullptr;
+    const char *text = this->rx_.c_str() + start;
+    unsigned long value = strtoul(text, &stop, 16);
+    if (end == start || stop != this->rx_.c_str() + end)
+      break;  // not a number: the rest of the frame is not trusted
+    extra.values[extra.count++] = (uint32_t) value;
+    start = end + 1;
+  }
+  if (extra.count == 0)
+    return;
+  this->extra_received_ = true;
+  for (auto *listener : this->listeners_)
+    listener->on_extra(extra);
 }
 
 void MczMaestro::handle_info_() {

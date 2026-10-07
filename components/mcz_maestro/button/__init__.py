@@ -36,7 +36,7 @@ BUTTONS = {
             MczButton, icon="mdi:clock-check", entity_category=ENTITY_CATEGORY_CONFIG
         ),
     ),
-    # Reset the service counter ("hours before service"): parameter 43 = 0
+    # Reset the service counter ("hours to service"): parameter 43 = 0
     "reset_service": (
         WRITE,
         43,

@@ -658,6 +658,32 @@ Power is exposed by two entities:
 
 To show only the useful controls, the visibility of the dashboard cards can be tied to the state of the `control_mode` select: thermostat and power sensor in automatic mode, power setting in manual mode.
 
+### Air and pellet recipes
+
+The recipes ("Ricetta Aria" and "Ricetta Pellet" in the MCZ app) correct the amount of combustion air and of pellets. They are exposed as two selects:
+
+| Key | Content | Values | Cell written |
+|---|---|---|---|
+| `air_recipe` | Air recipe | 0 to 4, shown as -2 to +2 | 459 |
+| `pellet_recipe` | Pellet recipe | 0 to 6, shown as -3 to +3 | 460 |
+
+```yaml
+select:
+  - platform: mcz_maestro
+    air_recipe:
+      name: "Air recipe"
+    pellet_recipe:
+      name: "Pellet recipe"
+```
+
+- Read: `C|RecuperoParametriExtra|11`, sent at startup, after a write, then every 10 minutes. The reply is a type `03` frame, in hexadecimal: `03|<air>|<pellets>|<room input>|<eco-stop delay>|<hysteresis>`.
+- Write: `C|WriteBancaDati|<cell>|1|<value as 2 hexadecimal digits>`. Example: `C|WriteBancaDati|459|1|03` sets the air recipe to +1.
+- These commands are only sent if one of the two selects is declared.
+- A recipe is written to the stove's database, i.e. its parameters, probably in permanent memory: change it by hand, not from a repetitive automation.
+- Labels can be translated with `options`, as for the other selects.
+- In a lambda, `write_database(cell, bytes, value)` writes a cell of the database.
+- The format comes from the sources of the MCZ app; it **has not been tested on a stove yet**.
+
 ### Raw frames
 
 The component exposes two functions usable in a lambda: `send_command("…")` sends a raw frame, without the final `^`, and `write_parameter(no., value)` writes a parameter. The examples use them to offer an action to Home Assistant, useful for testing a command that is not covered:

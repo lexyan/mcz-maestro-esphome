@@ -26,6 +26,7 @@ namespace esphome::mcz_maestro {
 static const uint8_t MCZ_MAX_FIELDS = 64;
 static const uint8_t MCZ_NO_FIELD = 0xFF;
 static const uint8_t MCZ_MAX_PROBES = 3;
+static const uint8_t MCZ_MAX_EXTRA = 8;
 
 // Fields of the information frame (reply to C|RecuperoInfo)
 static const uint8_t FIELD_STATE = 1;
@@ -55,10 +56,21 @@ bool mcz_state_is_burning(uint32_t state);
 /// True while the stove waits for a heat demand (auto eco 45, standby 46).
 bool mcz_state_is_waiting(uint32_t state);
 
+/// Decoded extra parameters (reply to C|RecuperoParametriExtra|11, frame type 03).
+/// Index 0 = air recipe, 1 = pellet recipe, 2 = room input, 3 = eco-stop delay, 4 = hysteresis.
+struct MczExtra {
+  uint32_t values[MCZ_MAX_EXTRA];
+  uint8_t count{0};
+
+  bool has(uint8_t index) const { return index < this->count; }
+  uint32_t get(uint8_t index) const { return this->values[index]; }
+};
+
 /// Implemented by the entities that follow the information frame.
 class MczListener {
  public:
   virtual void on_info(const MczInfo &info) = 0;
+  virtual void on_extra(const MczExtra &extra) {}
   virtual void on_hub_setup() {}
 };
 
@@ -97,6 +109,8 @@ class MczMaestro : public PollingComponent, public uart::UARTDevice {
   void set_announce(bool announce) { this->announce_ = announce; }
   void set_module_version(const char *version) { this->module_version_ = version; }
   void set_write_guard(uint32_t ms) { this->write_guard_ms_ = ms; }
+  /// Poll the extra parameters (recipes). Enabled by the entities that need them.
+  void set_extra_enabled(bool enabled) { this->extra_enabled_ = enabled; }
 #ifdef USE_SENSOR
   /// Declare a virtual WiFi probe. number is 1, 2 or 3 (sent as 51, 52 or 53).
   void add_probe(uint8_t number, sensor::Sensor *source, const char *version, bool require_api) {
@@ -141,8 +155,14 @@ class MczMaestro : public PollingComponent, public uart::UARTDevice {
   /// answers the write with the information frame itself. Returns false if the
   /// write was not queued (start-up guard or queue full).
   bool write_parameter(uint16_t param, int value);
+  /// Queue C|WriteBancaDati|<cell>|<bytes>|<value in hex>: writes a cell of the stove's
+  /// parameter database (1 or 2 bytes). The extra parameters are read back afterwards.
+  /// Returns false if the write was not queued (start-up guard or queue full).
+  bool write_database(uint16_t cell, uint8_t bytes, uint32_t value);
   /// Queue a request for the information frame.
   void request_info();
+  /// Queue a request for the extra parameters (recipes).
+  void request_extra();
   /// Set the stove clock from the configured time source.
   void sync_time();
 
@@ -157,6 +177,7 @@ class MczMaestro : public PollingComponent, public uart::UARTDevice {
  protected:
   void handle_frame_();
   void handle_info_();
+  void handle_extra_();
   void send_next_();
   void probe_tick_();
   void publish_texts_(const MczInfo &info);
@@ -168,6 +189,10 @@ class MczMaestro : public PollingComponent, public uart::UARTDevice {
   bool last_was_announce_{false};
   bool last_was_write_{false};
   bool refresh_pending_{false};
+  bool extra_enabled_{false};
+  bool extra_pending_{false};
+  bool extra_received_{false};
+  uint32_t last_extra_request_{0};
   uint32_t busy_since_{0};
   uint32_t last_reply_{0};
   uint32_t last_tick_{0};
