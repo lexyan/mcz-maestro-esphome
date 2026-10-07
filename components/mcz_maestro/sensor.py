@@ -10,10 +10,17 @@ from esphome.const import (
     UNIT_CELSIUS,
     UNIT_HOUR,
     UNIT_MINUTE,
+    UNIT_PERCENT,
     UNIT_REVOLUTIONS_PER_MINUTE,
 )
 
-from . import CONF_MCZ_MAESTRO_ID, HUB_CHILD_SCHEMA, mcz_maestro_ns
+from . import (
+    AUX_PARAMS,
+    AUX_PROBES,
+    CONF_MCZ_MAESTRO_ID,
+    HUB_CHILD_SCHEMA,
+    mcz_maestro_ns,
+)
 
 DEPENDENCIES = ["mcz_maestro"]
 
@@ -23,6 +30,7 @@ HALF = MczSensorConv.CONV_HALF
 HALF_OPT = MczSensorConv.CONV_HALF_OPT
 HOURS = MczSensorConv.CONV_HOURS
 POWER = MczSensorConv.CONV_POWER
+OPT = MczSensorConv.CONV_OPT
 
 
 def _temperature(decimals=1, diagnostic=False):
@@ -157,8 +165,24 @@ VIRTUAL_PROBE_INTERVALS = {
     "virtual_probe_3_interval": 3,
 }
 
+# Sensors read from an auxiliary frame. key: (frame, index, conversion, schema)
+AUX_SENSORS = {
+    # Signal of the WiFi probe as seen by the stove (255 = not reported)
+    "wifi_probe_signal": (
+        AUX_PROBES,
+        6,
+        OPT,
+        _raw(icon="mdi:wifi", unit=UNIT_PERCENT, measurement=True),
+    ),
+    # Limits of the setpoint accepted by the stove
+    "setpoint_min": (AUX_PARAMS, 2, RAW, _temperature(decimals=0, diagnostic=True)),
+    "setpoint_max": (AUX_PARAMS, 3, RAW, _temperature(decimals=0, diagnostic=True)),
+}
+
 CONFIG_SCHEMA = HUB_CHILD_SCHEMA.extend(
     {cv.Optional(key): schema for key, (_, _, schema) in SENSORS.items()}
+).extend(
+    {cv.Optional(key): item[3] for key, item in AUX_SENSORS.items()}
 ).extend(
     {
         # Temperature last sent to the stove
@@ -186,3 +210,7 @@ async def to_code(config):
         if conf := config.get(key):
             sens = await sensor.new_sensor(conf)
             cg.add(parent.set_probe_interval_sensor(number, sens))
+    for key, (kind, index, conv, _) in AUX_SENSORS.items():
+        if conf := config.get(key):
+            sens = await sensor.new_sensor(conf)
+            cg.add(parent.register_aux_sensor(sens, kind, index, conv))

@@ -101,13 +101,13 @@ mcz_maestro:
 | Platform | Keys |
 |---|---|
 | `climate` | one thermostat; `manual_preset` and `auto_preset` set the preset labels |
-| `sensor` | `ambient_temperature`, `fume_temperature`, `power_level`, `state_code`, `board_temperature`, `fume_fan_rpm`, `auger_rpm`, `auger_rpm_set`, `active_set`, `active_live`, `active_temperature`, `profile`, `total_hours`, `hours_power_1` … `hours_power_5`, `hours_to_service`, `ignitions`, `minutes_to_switch_off`, `wifi_probe_1` … `wifi_probe_3`, `virtual_probe_temperature`, `virtual_probe_interval` (and `virtual_probe_2_…`, `virtual_probe_3_…` for probes 2 and 3) |
+| `sensor` | `ambient_temperature`, `fume_temperature`, `power_level`, `state_code`, `board_temperature`, `fume_fan_rpm`, `auger_rpm`, `auger_rpm_set`, `active_set`, `active_live`, `active_temperature`, `profile`, `total_hours`, `hours_power_1` … `hours_power_5`, `hours_to_service`, `ignitions`, `minutes_to_switch_off`, `wifi_probe_1` … `wifi_probe_3`, `wifi_probe_signal`, `setpoint_min`, `setpoint_max`, `virtual_probe_temperature`, `virtual_probe_interval` (and `virtual_probe_2_…`, `virtual_probe_3_…` for probes 2 and 3) |
 | `sensor` (hydro, pellet sensor, raw) | `puffer_temperature`, `boiler_temperature`, `ntc3_temperature`, `return_temperature`, `pump_pwm`, `pellet_sensor_code`, `modbus_address`, `database_id`, `field_51`, `field_55`, `set_puffer`, `set_boiler`, `set_health` |
-| `binary_sensor` | `alarm`, `brazier_dirty`, `igniter`, `link`, `pellet_empty` |
-| `text_sensor` | `state`, `datetime`, `firmware`, `valve_3way`, `pellet_level` |
+| `binary_sensor` | `alarm`, `brazier_dirty`, `igniter`, `link`, `pellet_empty`, `fan_fitted`, `ducted_fan_1_fitted`, `ducted_fan_2_fitted`, `silent_mode_available` |
+| `text_sensor` | `state`, `datetime`, `firmware`, `valve_3way`, `pellet_level`, `last_alarm`, `alarm_history`, `wifi_probe_last_seen`, `bootloader_version`, `wifi_direct_version`, `wifi_remote_version`, `wifi_probe_version`, `database_name`, `database_revision`, `serial_number` |
 | `switch` | `power`, `eco_mode`, `silent_mode`, `active_mode`, `chronothermostat`, `sounds`, `virtual_probe`, `pellet_sensor` |
-| `select` | `control_mode`, `fan`, `ducted_fan_1`, `ducted_fan_2`, `season_mode`, `air_recipe`, `pellet_recipe` |
-| `number` | `setpoint`, `power`, `boiler_setpoint`, `chrono_t1` … `chrono_t3`, `profile`, `temperature_unit`, `sleep`, `antifreeze` |
+| `select` | `control_mode`, `fan`, `ducted_fan_1`, `ducted_fan_2`, `season_mode`, `air_recipe`, `pellet_recipe`, `room_input`, `wifi_probe_interval`, `wifi_probe_summer_interval`, `wifi_probe_offset` |
+| `number` | `setpoint`, `power`, `boiler_setpoint`, `chrono_t1` … `chrono_t3`, `profile`, `temperature_unit`, `sleep`, `antifreeze`, `eco_stop_delay`, `eco_stop_hysteresis` |
 | `button` | `refresh`, `reset_alarm`, `set_time`, `reset_service`, `reset_active`, `load_auger` |
 
 The labels of a `select` can be translated; the keys are the values sent to the stove:
@@ -126,6 +126,10 @@ From a lambda, `id(stove).send_command("C|RecuperoInfo")` sends a raw frame and
 `air_recipe` and `pellet_recipe` are the combustion recipes of the MCZ app (air -2 to +2,
 pellets -3 to +3). They are read with `C|RecuperoParametriExtra|11` and written to the
 stove's database with `C|WriteBancaDati` (cells 459 and 460); not tested on a stove yet.
+
+The eco stop settings, the room input, the WiFi probe settings, the alarm history, the
+versions and what the stove is fitted with are read from other frames of the MCZ app
+protocol, requested only when an entity needs them. See the documentation for details.
 
 Complete configurations: [`examples/full.yaml`](examples/full.yaml) (every option)
 and [`examples/mcz-ego2-fr.yaml`](examples/mcz-ego2-fr.yaml) (the stove this was built on, in French).

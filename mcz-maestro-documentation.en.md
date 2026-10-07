@@ -678,11 +678,58 @@ select:
 
 - Read: `C|RecuperoParametriExtra|11`, sent at startup, after a write, then every 10 minutes. The reply is a type `03` frame, in hexadecimal: `03|<air>|<pellets>|<room input>|<eco-stop delay>|<hysteresis>`.
 - Write: `C|WriteBancaDati|<cell>|1|<value as 2 hexadecimal digits>`. Example: `C|WriteBancaDati|459|1|03` sets the air recipe to +1.
-- These commands are only sent if one of the two selects is declared.
+- The read is only sent if an entity that depends on it is declared.
 - A recipe is written to the stove's database, i.e. its parameters, probably in permanent memory: change it by hand, not from a repetitive automation.
 - Labels can be translated with `options`, as for the other selects.
 - In a lambda, `write_database(cell, bytes, value)` writes a cell of the database.
 - The format comes from the sources of the MCZ app; it **has not been tested on a stove yet**.
+
+### Additional settings and information
+
+These entities mirror menus of the MCZ app. They are read from frames other than the information frame; a frame is only requested if an entity that depends on it is declared.
+
+**Settings** (configuration category)
+
+| Platform | Key | Content | Write |
+|---|---|---|---|
+| `number` | `eco_stop_delay` | Eco stop: delay before switching off, 1 to 30 minutes | cell 148, 2 bytes, in seconds |
+| `number` | `eco_stop_hysteresis` | Eco stop: drop below the setpoint that restarts the stove, 2 to 5 °C | cell 294 |
+| `select` | `room_input` | Room input: WiFi probe (255), thermostat (0) or the stove's own probe (1) | cell 356 |
+| `select` | `wifi_probe_interval` | Transmission interval of the WiFi probe: 10, 15 or 20 minutes | parameter 110 |
+| `select` | `wifi_probe_summer_interval` | Transmission interval in summer mode: 45, 60, 90 or 120 minutes | parameter 111 |
+| `select` | `wifi_probe_offset` | Offset of the WiFi probe, -5 to +5 °C | parameter 144 |
+
+**Information** (read-only, diagnostic category)
+
+| Platform | Key | Content |
+|---|---|---|
+| `text_sensor` | `last_alarm` | Last alarm and its date |
+| `text_sensor` | `alarm_history` | Last five alarms, in short form |
+| `text_sensor` | `wifi_probe_last_seen` | Last connection of the WiFi probe |
+| `sensor` | `wifi_probe_signal` | Signal of the WiFi probe as seen by the stove, in % |
+| `text_sensor` | `bootloader_version`, `wifi_direct_version`, `wifi_remote_version`, `wifi_probe_version` | Versions of the bootloader, of WiFi modules 1 and 2 and of the probe |
+| `text_sensor` | `database_name`, `database_revision` | Database loaded in the mainboard |
+| `text_sensor` | `serial_number` | Serial number |
+| `sensor` | `setpoint_min`, `setpoint_max` | Setpoint limits accepted by the stove |
+| `binary_sensor` | `fan_fitted`, `ducted_fan_1_fitted`, `ducted_fan_2_fitted`, `silent_mode_available` | What the stove is fitted with |
+
+**Frames read**
+
+| Content | Command | Type | Read |
+|---|---|---|---|
+| Recipes, room input, eco stop | `C\|RecuperoParametriExtra\|11` | `03` | At startup, after a write, then every 10 minutes |
+| Equipment and limits | `C\|RecuperoParametri` | `00` | Once |
+| Versions | `C\|RecuperoVersioneSW` | `0E` | Once |
+| WiFi probe | `C\|RecuperoSondeWiFi` | `0B` | At startup, after a write, then every 10 minutes |
+| Alarms | `C\|RecuperaAllarmi` | `0A` | At startup, when an alarm appears or clears, then every 10 minutes |
+
+- Until a frame has been answered, it is requested again every minute.
+- Choosing "Thermostat" as the room input also switches the stove to automatic regulation (parameter 40), as the app does.
+- The original probe sets the room input to "WiFi probe" when it is paired: keep that value with the virtual probe.
+- Dates are those of the stove's clock.
+- The version frame also carries the name and password of the stove's access point: the component does not expose them and does not write that frame to the logs.
+- The eco stop and the room input are written to the stove's database, like the recipes: same precautions.
+- The formats come from the sources of the MCZ app; they **have not been tested on a stove yet**.
 
 ### Raw frames
 

@@ -147,6 +147,13 @@ sensor:
       name: "WiFi probe 2"
     wifi_probe_3:
       name: "WiFi probe 3"
+    wifi_probe_signal:
+      name: "WiFi probe signal"
+    # Limits of the setpoint accepted by the stove
+    setpoint_min:
+      name: "Setpoint minimum"
+    setpoint_max:
+      name: "Setpoint maximum"
     # Hydro stoves, boiler
     puffer_temperature:
       name: "Buffer tank temperature"
@@ -189,6 +196,15 @@ binary_sensor:
       name: "Mainboard link"
     pellet_empty:
       name: "Pellet tank empty"
+    # What the stove is fitted with
+    fan_fitted:
+      name: "Front fan fitted"
+    ducted_fan_1_fitted:
+      name: "Ducted fan 1 fitted"
+    ducted_fan_2_fitted:
+      name: "Ducted fan 2 fitted"
+    silent_mode_available:
+      name: "Silent mode available"
 
 text_sensor:
   - platform: mcz_maestro
@@ -202,6 +218,29 @@ text_sensor:
       name: "3-way valve"
     pellet_level:
       name: "Pellet level"
+    # Alarm history
+    last_alarm:
+      name: "Last alarm"
+    alarm_history:
+      name: "Alarm history"
+    # WiFi probe
+    wifi_probe_last_seen:
+      name: "WiFi probe last seen"
+    # Versions
+    bootloader_version:
+      name: "Bootloader version"
+    wifi_direct_version:
+      name: "WiFi module 1 version"
+    wifi_remote_version:
+      name: "WiFi module 2 version"
+    wifi_probe_version:
+      name: "WiFi probe version"
+    database_name:
+      name: "Database name"
+    database_revision:
+      name: "Database revision"
+    serial_number:
+      name: "Serial number"
 
 switch:
   - platform: mcz_maestro
@@ -246,6 +285,17 @@ select:
     pellet_recipe:
       name: "Pellet recipe"
       # options: { 0: "-3", 1: "-2", 2: "-1", 3: "0", 4: "+1", 5: "+2", 6: "+3" }
+    # Source of the room temperature
+    room_input:
+      name: "Room input"
+      # options: { 255: "WiFi probe", 0: "Thermostat", 1: "Room probe" }
+    # WiFi probe settings stored in the stove
+    wifi_probe_interval:
+      name: "WiFi probe interval"
+    wifi_probe_summer_interval:
+      name: "WiFi probe summer interval"
+    wifi_probe_offset:
+      name: "WiFi probe offset"
 
 number:
   - platform: mcz_maestro
@@ -272,6 +322,11 @@ number:
       name: "Sleep code"
     antifreeze:
       name: "Antifreeze code"
+    # Eco stop
+    eco_stop_delay:
+      name: "Eco stop delay"
+    eco_stop_hysteresis:
+      name: "Eco stop hysteresis"
 
 button:
   - platform: mcz_maestro

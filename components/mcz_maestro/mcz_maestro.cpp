@@ -1,8 +1,11 @@
 #include "mcz_maestro.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
+#include <ctime>
 
 #include "esphome/core/application.h"
 #include "esphome/core/hal.h"
@@ -25,10 +28,21 @@ static const uint32_t REPLY_TIMEOUT_MS = 2000;
 static const uint32_t LINK_TIMEOUT_MS = 60000;
 static const uint32_t PROBE_FIRST_SEND_MS = 30000;
 static const char *const INFO_COMMAND = "C|RecuperoInfo";
-static const char *const EXTRA_COMMAND = "C|RecuperoParametriExtra|11";
-// Extra parameters only change when written: they are read rarely
-static const uint32_t EXTRA_INTERVAL_MS = 600000;
-static const uint32_t EXTRA_RETRY_MS = 60000;
+// Auxiliary frames only change when written: they are read rarely. interval 0 = read once.
+struct AuxDef {
+  const char *command;
+  const char *prefix;  // frame type of the reply
+  uint32_t interval_ms;
+};
+static const AuxDef AUX_DEFS[AUX_COUNT] = {
+    {"C|RecuperoParametriExtra|11", "03", 600000},
+    {"C|RecuperoParametri", "00", 0},
+    {"C|RecuperoVersioneSW", "0E", 0},
+    {"C|RecuperoSondeWiFi", "0B", 600000},
+    {"C|RecuperaAllarmi", "0A", 600000},
+};
+static const uint32_t AUX_RETRY_MS = 60000;
+static const size_t MAX_ALARMS = 5;
 static const char *const PROBE_COMMAND = "C|RecuperaTemperaturaWiFi|";
 static const size_t PROBE_COMMAND_LEN = 26;
 static const uint8_t PROBE_ID_BASE = 51;  // probes 1, 2 and 3 are sent as 51, 52 and 53
@@ -156,8 +170,10 @@ void MczMaestro::setup() {
     this->tx_queue_.emplace_back(buf);
   }
   this->request_info();
-  if (this->extra_enabled_)
-    this->request_extra();
+  for (uint8_t kind = 0; kind < AUX_COUNT; kind++) {
+    if (this->aux_[kind].enabled)
+      this->request_aux((MczAuxKind) kind);
+  }
   for (auto *listener : this->listeners_)
     listener->on_hub_setup();
 }
@@ -168,9 +184,11 @@ void MczMaestro::dump_config() {
                 "  Announce at start-up: %s\n"
                 "  Write guard: %u ms\n"
                 "  Listeners: %u\n"
-                "  Extra parameters (recipes): %s",
+                "  Auxiliary frames: extra %s, capabilities %s, versions %s, WiFi probes %s, alarms %s",
                 YESNO(this->announce_), (unsigned) this->write_guard_ms_, (unsigned) this->listeners_.size(),
-                YESNO(this->extra_enabled_));
+                YESNO(this->aux_[AUX_EXTRA].enabled), YESNO(this->aux_[AUX_PARAMS].enabled),
+                YESNO(this->aux_[AUX_VERSIONS].enabled), YESNO(this->aux_[AUX_PROBES].enabled),
+                YESNO(this->aux_[AUX_ALARMS].enabled));
 #ifdef USE_SENSOR
   for (uint8_t i = 0; i < MCZ_MAX_PROBES; i++) {
     if (this->probes_[i].source != nullptr)
@@ -183,10 +201,15 @@ void MczMaestro::dump_config() {
 
 void MczMaestro::update() {
   this->request_info();
-  if (this->extra_enabled_) {
-    const uint32_t interval = this->extra_received_ ? EXTRA_INTERVAL_MS : EXTRA_RETRY_MS;
-    if (millis() - this->last_extra_request_ >= interval)
-      this->request_extra();
+  const uint32_t now = millis();
+  for (uint8_t kind = 0; kind < AUX_COUNT; kind++) {
+    auto &aux = this->aux_[kind];
+    if (!aux.enabled)
+      continue;
+    // Until the first reply the request is repeated every minute
+    const uint32_t interval = aux.received ? AUX_DEFS[kind].interval_ms : AUX_RETRY_MS;
+    if (interval != 0 && now - aux.last_request >= interval)
+      this->request_aux((MczAuxKind) kind);
   }
 }
 
@@ -203,13 +226,14 @@ void MczMaestro::request_info() {
   this->send_command(INFO_COMMAND);
 }
 
-void MczMaestro::request_extra() {
-  this->last_extra_request_ = millis();
+void MczMaestro::request_aux(MczAuxKind kind) {
+  this->aux_[kind].last_request = millis();
+  this->aux_[kind].pending = false;
   for (const auto &queued : this->tx_queue_) {
-    if (queued == EXTRA_COMMAND)
+    if (queued == AUX_DEFS[kind].command)
       return;
   }
-  this->send_command(EXTRA_COMMAND);
+  this->send_command(AUX_DEFS[kind].command);
 }
 
 bool MczMaestro::write_database(uint16_t cell, uint8_t bytes, uint32_t value) {
@@ -230,7 +254,7 @@ bool MczMaestro::write_database(uint16_t cell, uint8_t bytes, uint32_t value) {
   if (!this->send_command(buf))
     return false;
   // A single read-back follows the last write of a burst
-  this->extra_pending_ = true;
+  this->refresh_aux(AUX_EXTRA);
   return true;
 }
 
@@ -307,6 +331,7 @@ void MczMaestro::loop() {
     this->busy_ = false;
     this->last_was_probe_ = false;
     this->last_was_write_ = false;
+    this->last_aux_ = -1;
     this->rx_.clear();
   }
 
@@ -315,9 +340,9 @@ void MczMaestro::loop() {
       this->refresh_pending_ = false;
       this->request_info();
     }
-    if (this->tx_queue_.empty() && this->extra_pending_) {
-      this->extra_pending_ = false;
-      this->request_extra();
+    for (uint8_t kind = 0; kind < AUX_COUNT && this->tx_queue_.empty(); kind++) {
+      if (this->aux_[kind].pending)
+        this->request_aux((MczAuxKind) kind);
     }
     if (!this->tx_queue_.empty())
       this->send_next_();
@@ -353,6 +378,11 @@ void MczMaestro::send_next_() {
   }
   this->last_was_announce_ = cmd.rfind("RispostaAccensione", 0) == 0;
   this->last_was_write_ = cmd.rfind("C|WriteParametri", 0) == 0;
+  this->last_aux_ = -1;
+  for (uint8_t kind = 0; kind < AUX_COUNT; kind++) {
+    if (cmd == AUX_DEFS[kind].command)
+      this->last_aux_ = (int8_t) kind;
+  }
   this->write_str(cmd.c_str());
   this->write_str("^\r\n");
   this->busy_ = true;
@@ -367,7 +397,14 @@ void MczMaestro::handle_frame_() {
   size_t pos;
   while ((pos = this->rx_.find("%7C")) != std::string::npos)
     this->rx_.replace(pos, 3, "|");
-  ESP_LOGD(TAG, "RX: %s", this->rx_.c_str());
+  const int8_t aux = this->last_aux_;
+  this->last_aux_ = -1;
+  if (aux == AUX_VERSIONS) {
+    // This frame carries the name and password of the stove's WiFi access point
+    ESP_LOGD(TAG, "RX: version frame, %u bytes (not logged)", (unsigned) this->rx_.size());
+  } else {
+    ESP_LOGD(TAG, "RX: %s", this->rx_.c_str());
+  }
 
   if (this->last_was_probe_) {
     // Reply to the WiFi probe frame: 2 hex digits = minutes before the next transmission
@@ -392,7 +429,7 @@ void MczMaestro::handle_frame_() {
     return;
   }
 
-  // Only the information frame (type 01) and the extra parameters (type 03) are decoded
+  // The information frame (type 01) and the auxiliary frames are decoded
   const bool after_write = this->last_was_write_;
   this->last_was_write_ = false;
   if (this->rx_.size() >= 3 && this->rx_[0] == '0' && this->rx_[1] == '1' && this->rx_[2] == '|') {
@@ -401,33 +438,223 @@ void MczMaestro::handle_frame_() {
     if (after_write && this->tx_queue_.empty())
       this->refresh_pending_ = false;
     this->handle_info_();
-  } else if (this->rx_.size() >= 3 && this->rx_[0] == '0' && this->rx_[1] == '3' && this->rx_[2] == '|') {
-    this->handle_extra_();
+  } else if (aux >= 0 && this->rx_.size() >= 3 && this->rx_[2] == '|' &&
+             strncmp(this->rx_.c_str(), AUX_DEFS[aux].prefix, 2) == 0) {
+    // An auxiliary frame is only accepted as the reply to its own request
+    this->handle_aux_((MczAuxKind) aux);
   }
 }
 
-void MczMaestro::handle_extra_() {
-  // 03|<air recipe>|<pellet recipe>|<room input>|<eco-stop delay>|<hysteresis>, in hexadecimal
-  MczExtra extra;
-  size_t start = 3;
-  const size_t len = this->rx_.size();
-  while (start < len && extra.count < MCZ_MAX_EXTRA) {
-    size_t end = this->rx_.find('|', start);
+// Splits "a|b|c" from start into hexadecimal values. Fields that are not numbers are left invalid.
+static void parse_hex_fields(const std::string &frame, size_t start, MczValues &out) {
+  uint8_t index = 0;
+  const size_t len = frame.size();
+  while (start <= len && index < MCZ_MAX_VALUES) {
+    size_t end = frame.find('|', start);
     if (end == std::string::npos)
       end = len;
-    char *stop = nullptr;
-    const char *text = this->rx_.c_str() + start;
-    unsigned long value = strtoul(text, &stop, 16);
-    if (end == start || stop != this->rx_.c_str() + end)
-      break;  // not a number: the rest of the frame is not trusted
-    extra.values[extra.count++] = (uint32_t) value;
+    if (end > start) {
+      char *stop = nullptr;
+      unsigned long value = strtoul(frame.c_str() + start, &stop, 16);
+      if (stop == frame.c_str() + end) {
+        out.values[index] = (uint32_t) value;
+        out.valid |= 1UL << index;
+      }
+    }
+    index++;
     start = end + 1;
   }
-  if (extra.count == 0)
+}
+
+// Field number index of "a|b|c" from start, empty if absent.
+static std::string text_field(const std::string &frame, size_t start, uint8_t index) {
+  const size_t len = frame.size();
+  while (start <= len) {
+    size_t end = frame.find('|', start);
+    if (end == std::string::npos)
+      end = len;
+    if (index == 0)
+      return frame.substr(start, end - start);
+    index--;
+    start = end + 1;
+  }
+  return "";
+}
+
+// The stove counts seconds since 1970 on its own clock: the date is shown as the stove sees it.
+static bool format_timestamp(uint32_t timestamp, char *buf, size_t size) {
+  if (timestamp == 0 || timestamp == 0xFFFFFFFFUL)
+    return false;
+  time_t t = (time_t) timestamp;
+  struct tm tm;
+  if (gmtime_r(&t, &tm) == nullptr)
+    return false;
+  snprintf(buf, size, "%04d-%02d-%02d %02d:%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour,
+           tm.tm_min);
+  return true;
+}
+
+void MczMaestro::publish_text_(MczTextKind kind, const std::string &text) {
+#ifdef USE_TEXT_SENSOR
+  auto *sensor = this->text_sensors_[kind];
+  if (sensor == nullptr)
     return;
-  this->extra_received_ = true;
+  if (sensor->has_state() && sensor->get_state() == text)
+    return;
+  sensor->publish_state(text);
+#endif
+}
+
+void MczMaestro::handle_aux_(MczAuxKind kind) {
+  this->aux_[kind].received = true;
+
+  if (kind == AUX_VERSIONS) {
+    this->handle_versions_();
+    return;
+  }
+  if (kind == AUX_ALARMS) {
+    this->handle_alarms_();
+    return;
+  }
+
+  MczValues values;
+  if (kind == AUX_PARAMS) {
+    // One value per byte, written as a single run of hexadecimal digits
+    const size_t len = this->rx_.size();
+    for (uint8_t i = 0; i < MCZ_MAX_VALUES && 3 + 2 * (size_t) i + 1 < len; i++) {
+      const char hex[3] = {this->rx_[3 + 2 * i], this->rx_[4 + 2 * i], 0};
+      if (!isxdigit((unsigned char) hex[0]) || !isxdigit((unsigned char) hex[1]))
+        break;
+      values.values[i] = (uint32_t) strtoul(hex, nullptr, 16);
+      values.valid |= 1UL << i;
+    }
+  } else {
+    parse_hex_fields(this->rx_, 3, values);
+  }
+
+#ifdef USE_SENSOR
+  for (auto &entry : this->aux_sensors_) {
+    if (entry.kind != kind || !values.has(entry.index))
+      continue;
+    float value = values.get(entry.index);
+    if (entry.conv == CONV_OPT && value == 255)
+      value = NAN;
+    entry.sensor->publish_state(value);
+  }
+#endif
+#ifdef USE_BINARY_SENSOR
+  for (auto &entry : this->aux_binary_sensors_) {
+    if (entry.kind == kind && values.has(entry.index))
+      entry.sensor->publish_state(values.get(entry.index) != 0);
+  }
+#endif
+#ifdef USE_TEXT_SENSOR
+  if (kind == AUX_PROBES && values.has(2)) {
+    char buf[24];
+    if (format_timestamp(values.get(2), buf, sizeof(buf))) {
+      this->publish_text_(TEXT_PROBE_LAST_SEEN, buf);
+    } else {
+      this->publish_text_(TEXT_PROBE_LAST_SEEN, MCZ_T("Never", "Jamais"));
+    }
+  }
+#endif
+
   for (auto *listener : this->listeners_)
-    listener->on_extra(extra);
+    listener->on_aux(kind, values);
+}
+
+void MczMaestro::handle_versions_() {
+#ifdef USE_TEXT_SENSOR
+  // 0E|serial|firmware|database name (hex)|database revision (hex)|direct SSID|direct password|
+  // direct version|remote MAC|remote version|bootloader|probe version|baud 1|baud 2
+  auto field = [this](uint8_t index) {
+    std::string text = text_field(this->rx_, 3, index);
+    if (text.size() > 32)
+      text.resize(32);
+    return text;
+  };
+  this->publish_text_(TEXT_SERIAL_NUMBER, field(0));
+  this->publish_text_(TEXT_WIFI_DIRECT, field(6));
+  this->publish_text_(TEXT_WIFI_REMOTE, field(8));
+  this->publish_text_(TEXT_BOOTLOADER, field(9));
+  this->publish_text_(TEXT_WIFI_PROBE, field(10));
+
+  // Database name: ASCII text written in hexadecimal
+  const std::string hex = text_field(this->rx_, 3, 2);
+  std::string name;
+  for (size_t i = 0; i + 1 < hex.size() && name.size() < 32; i += 2) {
+    const char pair[3] = {hex[i], hex[i + 1], 0};
+    const char c = (char) strtoul(pair, nullptr, 16);
+    if (c >= 32 && c < 127)
+      name.push_back(c);
+  }
+  while (!name.empty() && name.back() == ' ')
+    name.pop_back();
+  while (!name.empty() && name.front() == ' ')
+    name.erase(name.begin());
+  this->publish_text_(TEXT_DATABASE_NAME, name);
+
+  const std::string revision = text_field(this->rx_, 3, 3);
+  if (!revision.empty()) {
+    char buf[12];
+    snprintf(buf, sizeof(buf), "%lu", strtoul(revision.c_str(), nullptr, 16));
+    this->publish_text_(TEXT_DATABASE_REVISION, buf);
+  }
+#endif
+}
+
+void MczMaestro::handle_alarms_() {
+#ifdef USE_TEXT_SENSOR
+  // 0A|state|timestamp|state|timestamp|... ; an unused entry has the timestamp ffffffff
+  MczValues values;
+  parse_hex_fields(this->rx_, 3, values);
+  struct Alarm {
+    uint32_t state;
+    uint32_t timestamp;
+  };
+  Alarm alarms[MCZ_MAX_VALUES / 2];
+  size_t count = 0;
+  for (uint8_t i = 0; i + 1 < MCZ_MAX_VALUES; i += 2) {
+    if (!values.has(i) || !values.has(i + 1) || values.get(i + 1) == 0xFFFFFFFFUL)
+      continue;
+    alarms[count++] = {values.get(i), values.get(i + 1)};
+  }
+  // Most recent first
+  for (size_t i = 1; i < count; i++) {
+    for (size_t j = i; j > 0 && alarms[j].timestamp > alarms[j - 1].timestamp; j--)
+      std::swap(alarms[j], alarms[j - 1]);
+  }
+
+  if (count == 0) {
+    this->publish_text_(TEXT_LAST_ALARM, MCZ_T("None", "Aucune"));
+    this->publish_text_(TEXT_ALARM_HISTORY, MCZ_T("None", "Aucune"));
+    return;
+  }
+
+  char date[24];
+  std::string last = state_text(alarms[0].state);
+  if (format_timestamp(alarms[0].timestamp, date, sizeof(date))) {
+    last += " (";
+    last += date;
+    last += ")";
+  }
+  this->publish_text_(TEXT_LAST_ALARM, last);
+
+  // Short form, to stay within the 255 characters of a Home Assistant state
+  std::string history;
+  for (size_t i = 0; i < count && i < MAX_ALARMS; i++) {
+    if (i != 0)
+      history += ", ";
+    const char *text = state_text(alarms[i].state);
+    const char *dash = strstr(text, " - ");
+    history.append(text, dash != nullptr ? (size_t) (dash - text) : strlen(text));
+    if (format_timestamp(alarms[i].timestamp, date, sizeof(date))) {
+      history += " ";
+      history += date;
+    }
+  }
+  this->publish_text_(TEXT_ALARM_HISTORY, history);
+#endif
 }
 
 void MczMaestro::handle_info_() {
@@ -451,6 +678,15 @@ void MczMaestro::handle_info_() {
     }
     field++;
     start = end + 1;
+  }
+
+  if (info.has(FIELD_STATE)) {
+    // The alarm history is read again when an alarm appears or is cleared
+    const uint32_t state = info.get(FIELD_STATE);
+    const int8_t alarm = state >= 50 && state <= 67 ? 1 : 0;
+    if (this->alarm_active_ != -1 && alarm != this->alarm_active_)
+      this->refresh_aux(AUX_ALARMS);
+    this->alarm_active_ = alarm;
   }
 
   if (info.has(FIELD_CONTROL_MODE)) {

@@ -26,7 +26,7 @@ namespace esphome::mcz_maestro {
 static const uint8_t MCZ_MAX_FIELDS = 64;
 static const uint8_t MCZ_NO_FIELD = 0xFF;
 static const uint8_t MCZ_MAX_PROBES = 3;
-static const uint8_t MCZ_MAX_EXTRA = 8;
+static const uint8_t MCZ_MAX_VALUES = 32;
 
 // Fields of the information frame (reply to C|RecuperoInfo)
 static const uint8_t FIELD_STATE = 1;
@@ -56,13 +56,31 @@ bool mcz_state_is_burning(uint32_t state);
 /// True while the stove waits for a heat demand (auto eco 45, standby 46).
 bool mcz_state_is_waiting(uint32_t state);
 
-/// Decoded extra parameters (reply to C|RecuperoParametriExtra|11, frame type 03).
-/// Index 0 = air recipe, 1 = pellet recipe, 2 = room input, 3 = eco-stop delay, 4 = hysteresis.
-struct MczExtra {
-  uint32_t values[MCZ_MAX_EXTRA];
-  uint8_t count{0};
+/// Frames read in addition to the information frame. They only change when written,
+/// so they are requested rarely, and only when an entity needs them.
+enum MczAuxKind : uint8_t {
+  // C|RecuperoParametriExtra|11, type 03: 0 = air recipe, 1 = pellet recipe, 2 = room input,
+  // 3 = eco-stop delay (seconds), 4 = eco-stop hysteresis
+  AUX_EXTRA = 0,
+  // C|RecuperoParametri, type 00, one value per byte: 2/3 = setpoint min/max, 8/14/20 = front fan /
+  // ducted fan 1 / ducted fan 2 fitted, 30 = silent mode available
+  AUX_PARAMS,
+  // C|RecuperoVersioneSW, type 0E: text fields, decoded by the hub
+  AUX_VERSIONS,
+  // C|RecuperoSondeWiFi, type 0B: 0 = interval (min), 1 = summer interval (min), 2 = last
+  // connection (timestamp), 6 = signal (%), 7 = offset
+  AUX_PROBES,
+  // C|RecuperaAllarmi, type 0A: pairs of state / timestamp, decoded by the hub
+  AUX_ALARMS,
+  AUX_COUNT,
+};
 
-  bool has(uint8_t index) const { return index < this->count; }
+/// Values of an auxiliary frame, in the order of the frame.
+struct MczValues {
+  uint32_t values[MCZ_MAX_VALUES];
+  uint32_t valid{0};
+
+  bool has(uint8_t index) const { return index < MCZ_MAX_VALUES && ((this->valid >> index) & 1UL) != 0; }
   uint32_t get(uint8_t index) const { return this->values[index]; }
 };
 
@@ -70,7 +88,7 @@ struct MczExtra {
 class MczListener {
  public:
   virtual void on_info(const MczInfo &info) = 0;
-  virtual void on_extra(const MczExtra &extra) {}
+  virtual void on_aux(MczAuxKind kind, const MczValues &values) {}
   virtual void on_hub_setup() {}
 };
 
@@ -80,6 +98,7 @@ enum MczSensorConv : uint8_t {
   CONV_HALF_OPT,  // value / 2, 255 = probe absent
   CONV_HOURS,     // seconds to hours
   CONV_POWER,     // 11..15 to 1..5
+  CONV_OPT,       // value as sent, 255 = not available
 };
 
 enum MczBinaryMode : uint8_t {
@@ -94,6 +113,17 @@ enum MczTextKind : uint8_t {
   TEXT_FIRMWARE,
   TEXT_VALVE,
   TEXT_PELLET,
+  // Texts below come from the auxiliary frames
+  TEXT_BOOTLOADER,
+  TEXT_WIFI_DIRECT,
+  TEXT_WIFI_REMOTE,
+  TEXT_WIFI_PROBE,
+  TEXT_DATABASE_NAME,
+  TEXT_DATABASE_REVISION,
+  TEXT_SERIAL_NUMBER,
+  TEXT_PROBE_LAST_SEEN,
+  TEXT_LAST_ALARM,
+  TEXT_ALARM_HISTORY,
   TEXT_KIND_COUNT,
 };
 
@@ -109,8 +139,8 @@ class MczMaestro : public PollingComponent, public uart::UARTDevice {
   void set_announce(bool announce) { this->announce_ = announce; }
   void set_module_version(const char *version) { this->module_version_ = version; }
   void set_write_guard(uint32_t ms) { this->write_guard_ms_ = ms; }
-  /// Poll the extra parameters (recipes). Enabled by the entities that need them.
-  void set_extra_enabled(bool enabled) { this->extra_enabled_ = enabled; }
+  /// Poll an auxiliary frame. Called by the entities that need it.
+  void enable_aux(MczAuxKind kind) { this->aux_[kind].enabled = true; }
 #ifdef USE_SENSOR
   /// Declare a virtual WiFi probe. number is 1, 2 or 3 (sent as 51, 52 or 53).
   void add_probe(uint8_t number, sensor::Sensor *source, const char *version, bool require_api) {
@@ -132,6 +162,10 @@ class MczMaestro : public PollingComponent, public uart::UARTDevice {
   void register_sensor(sensor::Sensor *s, uint8_t field, MczSensorConv conv) {
     this->sensors_.push_back({s, field, conv});
   }
+  void register_aux_sensor(sensor::Sensor *s, MczAuxKind kind, uint8_t index, MczSensorConv conv) {
+    this->aux_sensors_.push_back({s, kind, index, conv});
+    this->enable_aux(kind);
+  }
 #endif
 #ifdef USE_BINARY_SENSOR
   void register_binary_sensor(binary_sensor::BinarySensor *s, uint8_t field, MczBinaryMode mode, uint8_t a,
@@ -139,6 +173,10 @@ class MczMaestro : public PollingComponent, public uart::UARTDevice {
     this->binary_sensors_.push_back({s, field, mode, a, b});
   }
   void set_link_binary_sensor(binary_sensor::BinarySensor *s) { this->link_sensor_ = s; }
+  void register_aux_binary_sensor(binary_sensor::BinarySensor *s, MczAuxKind kind, uint8_t index) {
+    this->aux_binary_sensors_.push_back({s, kind, index});
+    this->enable_aux(kind);
+  }
 #endif
 #ifdef USE_TEXT_SENSOR
   void set_text_sensor(MczTextKind kind, text_sensor::TextSensor *s) { this->text_sensors_[kind] = s; }
@@ -157,12 +195,19 @@ class MczMaestro : public PollingComponent, public uart::UARTDevice {
   bool write_parameter(uint16_t param, int value);
   /// Queue C|WriteBancaDati|<cell>|<bytes>|<value in hex>: writes a cell of the stove's
   /// parameter database (1 or 2 bytes). The extra parameters are read back afterwards.
+  /// The technical parameters of the stove live in the same database: only write cells
+  /// whose meaning is known.
   /// Returns false if the write was not queued (start-up guard or queue full).
   bool write_database(uint16_t cell, uint8_t bytes, uint32_t value);
   /// Queue a request for the information frame.
   void request_info();
-  /// Queue a request for the extra parameters (recipes).
-  void request_extra();
+  /// Queue a request for an auxiliary frame.
+  void request_aux(MczAuxKind kind);
+  /// Read an auxiliary frame again once the pending writes are sent.
+  void refresh_aux(MczAuxKind kind) {
+    if (this->aux_[kind].enabled)
+      this->aux_[kind].pending = true;
+  }
   /// Set the stove clock from the configured time source.
   void sync_time();
 
@@ -177,7 +222,10 @@ class MczMaestro : public PollingComponent, public uart::UARTDevice {
  protected:
   void handle_frame_();
   void handle_info_();
-  void handle_extra_();
+  void handle_aux_(MczAuxKind kind);
+  void handle_versions_();
+  void handle_alarms_();
+  void publish_text_(MczTextKind kind, const std::string &text);
   void send_next_();
   void probe_tick_();
   void publish_texts_(const MczInfo &info);
@@ -189,10 +237,15 @@ class MczMaestro : public PollingComponent, public uart::UARTDevice {
   bool last_was_announce_{false};
   bool last_was_write_{false};
   bool refresh_pending_{false};
-  bool extra_enabled_{false};
-  bool extra_pending_{false};
-  bool extra_received_{false};
-  uint32_t last_extra_request_{0};
+  struct AuxQuery {
+    bool enabled{false};
+    bool pending{false};   // to be requested once the queue is empty
+    bool received{false};
+    uint32_t last_request{0};
+  };
+  AuxQuery aux_[AUX_COUNT];
+  int8_t last_aux_{-1};  // auxiliary frame whose reply is awaited, -1 if none
+  int8_t alarm_active_{-1};
   uint32_t busy_since_{0};
   uint32_t last_reply_{0};
   uint32_t last_tick_{0};
@@ -214,6 +267,13 @@ class MczMaestro : public PollingComponent, public uart::UARTDevice {
     MczSensorConv conv;
   };
   std::vector<SensorEntry> sensors_;
+  struct AuxSensorEntry {
+    sensor::Sensor *sensor;
+    MczAuxKind kind;
+    uint8_t index;
+    MczSensorConv conv;
+  };
+  std::vector<AuxSensorEntry> aux_sensors_;
   struct ProbeEntry {
     sensor::Sensor *source{nullptr};  // nullptr = probe not declared
     sensor::Sensor *sent_sensor{nullptr};
@@ -234,6 +294,12 @@ class MczMaestro : public PollingComponent, public uart::UARTDevice {
     uint8_t b;
   };
   std::vector<BinaryEntry> binary_sensors_;
+  struct AuxBinaryEntry {
+    binary_sensor::BinarySensor *sensor;
+    MczAuxKind kind;
+    uint8_t index;
+  };
+  std::vector<AuxBinaryEntry> aux_binary_sensors_;
   binary_sensor::BinarySensor *link_sensor_{nullptr};
   int8_t link_published_{-1};
 #endif

@@ -9,12 +9,18 @@ static const char *const TAG = "mcz_maestro.select";
 void MczSelect::control(size_t index) {
   if (index >= this->mappings_.size())
     return;
+  const uint8_t value = this->mappings_[index];
   // The state is published when the stove reports the new value
   if (this->cell_ != 0) {
-    this->parent_->write_database(this->cell_, 1, this->mappings_[index]);
-  } else {
-    this->parent_->write_parameter(this->param_, this->mappings_[index]);
+    if (!this->parent_->write_database(this->cell_, 1, value))
+      return;
+    // Same sequence as the MCZ app
+    if (this->auto_mode_on_zero_ && value == 0)
+      this->parent_->write_parameter(PARAM_CONTROL_MODE, 1);
+    return;
   }
+  if (this->parent_->write_parameter(this->param_, value) && this->aux_index_ != MCZ_NO_FIELD)
+    this->parent_->refresh_aux(this->aux_kind_);
 }
 
 void MczSelect::on_info(const MczInfo &info) {
@@ -23,10 +29,10 @@ void MczSelect::on_info(const MczInfo &info) {
   this->publish_value_(info.get(this->field_), "Field", this->field_);
 }
 
-void MczSelect::on_extra(const MczExtra &extra) {
-  if (this->extra_index_ == MCZ_NO_FIELD || !extra.has(this->extra_index_))
+void MczSelect::on_aux(MczAuxKind kind, const MczValues &values) {
+  if (this->aux_index_ == MCZ_NO_FIELD || kind != this->aux_kind_ || !values.has(this->aux_index_))
     return;
-  this->publish_value_(extra.get(this->extra_index_), "Extra parameter", this->extra_index_);
+  this->publish_value_(values.get(this->aux_index_), "Auxiliary value", this->aux_index_);
 }
 
 void MczSelect::publish_value_(uint32_t value, const char *what, uint8_t number) {

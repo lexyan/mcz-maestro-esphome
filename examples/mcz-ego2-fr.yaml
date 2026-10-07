@@ -152,6 +152,12 @@ sensor:
       name: "Sonde virtuelle - intervalle demandé"
     wifi_probe_1:
       name: "Sonde WiFi 1 (lue par le poêle)"
+    wifi_probe_signal:
+      name: "Sonde WiFi - signal"
+    setpoint_min:
+      name: "Consigne minimale"
+    setpoint_max:
+      name: "Consigne maximale"
 
 binary_sensor:
   - platform: mcz_maestro
@@ -163,6 +169,15 @@ binary_sensor:
       name: "Bougie"
     link:
       name: "Liaison carte mère"
+    # Équipement du poêle
+    fan_fitted:
+      name: "Ventilation frontale présente"
+    ducted_fan_1_fitted:
+      name: "Ventilation canalisée 1 présente"
+    ducted_fan_2_fitted:
+      name: "Ventilation canalisée 2 présente"
+    silent_mode_available:
+      name: "Mode silencieux disponible"
 
 text_sensor:
   - platform: mcz_maestro
@@ -172,6 +187,26 @@ text_sensor:
       name: "Date et heure du poêle"
     firmware:
       name: "Firmware carte mère"
+    last_alarm:
+      name: "Dernière alarme"
+    alarm_history:
+      name: "Historique des alarmes"
+    wifi_probe_last_seen:
+      name: "Sonde WiFi - dernière connexion"
+    bootloader_version:
+      name: "Version bootloader"
+    wifi_direct_version:
+      name: "Version module WiFi 1"
+    wifi_remote_version:
+      name: "Version module WiFi 2"
+    wifi_probe_version:
+      name: "Version sonde WiFi"
+    database_name:
+      name: "Banque de données"
+    database_revision:
+      name: "Révision banque de données"
+    serial_number:
+      name: "Numéro de série"
 
 switch:
   - platform: mcz_maestro
@@ -216,6 +251,17 @@ select:
       name: "Recette air"
     pellet_recipe:
       name: "Recette pellets"
+    # Source de la température ambiante
+    room_input:
+      name: "Entrée ambiance"
+      options: { 255: "Sonde WiFi", 0: "Thermostat", 1: "Sonde du poêle" }
+    # Réglages de la sonde WiFi mémorisés par le poêle
+    wifi_probe_interval:
+      name: "Sonde WiFi - intervalle (min)"
+    wifi_probe_summer_interval:
+      name: "Sonde WiFi - intervalle été (min)"
+    wifi_probe_offset:
+      name: "Sonde WiFi - décalage (°C)"
 
 number:
   - platform: mcz_maestro
@@ -223,6 +269,10 @@ number:
       name: "Consigne"
     power:
       name: "Puissance (réglage)"
+    eco_stop_delay:
+      name: "Eco stop - délai"
+    eco_stop_hysteresis:
+      name: "Eco stop - hystérésis"
 
 button:
   - platform: mcz_maestro

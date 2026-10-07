@@ -6,9 +6,10 @@ from esphome.const import (
     DEVICE_CLASS_TEMPERATURE,
     ENTITY_CATEGORY_CONFIG,
     UNIT_CELSIUS,
+    UNIT_MINUTE,
 )
 
-from .. import CONF_MCZ_MAESTRO_ID, HUB_CHILD_SCHEMA, mcz_maestro_ns
+from .. import AUX_EXTRA, CONF_MCZ_MAESTRO_ID, HUB_CHILD_SCHEMA, mcz_maestro_ns
 
 DEPENDENCIES = ["mcz_maestro"]
 
@@ -18,6 +19,7 @@ RAW = MczNumberKind.NUMBER_RAW
 HALF = MczNumberKind.NUMBER_HALF
 HALF_OPT = MczNumberKind.NUMBER_HALF_OPT
 POWER = MczNumberKind.NUMBER_POWER
+MINUTES = MczNumberKind.NUMBER_MINUTES
 NO_FIELD = 0xFF
 
 
@@ -73,9 +75,52 @@ NUMBERS = {
     "antifreeze": (RAW, 154, 60, 0, 255, 1, _raw()),
 }
 
+# Numbers read from an auxiliary frame and written to the stove's database.
+# key: (kind, frame, index in the frame, cell, bytes, min, max, step, schema)
+AUX_NUMBERS = {
+    # Eco stop: minutes at the setpoint before the stove switches off
+    "eco_stop_delay": (
+        MINUTES,
+        AUX_EXTRA,
+        3,
+        148,
+        2,
+        1,
+        30,
+        1,
+        _box(
+            number.number_schema(
+                MczNumber,
+                icon="mdi:timer-sand",
+                unit_of_measurement=UNIT_MINUTE,
+                entity_category=ENTITY_CATEGORY_CONFIG,
+            )
+        ),
+    ),
+    # Eco stop: degrees below the setpoint at which the stove restarts
+    "eco_stop_hysteresis": (
+        RAW,
+        AUX_EXTRA,
+        4,
+        294,
+        1,
+        2,
+        5,
+        1,
+        _box(
+            number.number_schema(
+                MczNumber,
+                icon="mdi:thermometer-chevron-down",
+                unit_of_measurement=UNIT_CELSIUS,
+                entity_category=ENTITY_CATEGORY_CONFIG,
+            )
+        ),
+    ),
+}
+
 CONFIG_SCHEMA = HUB_CHILD_SCHEMA.extend(
     {cv.Optional(key): item[6] for key, item in NUMBERS.items()}
-)
+).extend({cv.Optional(key): item[8] for key, item in AUX_NUMBERS.items()})
 
 
 async def to_code(config):
@@ -90,3 +135,15 @@ async def to_code(config):
             cg.add(var.set_param(param))
             cg.add(var.set_field(field))
             cg.add(parent.register_listener(var))
+    for key, item in AUX_NUMBERS.items():
+        kind, aux, index, cell, nbytes, min_, max_, step, _ = item
+        if conf := config.get(key):
+            var = await number.new_number(
+                conf, min_value=min_, max_value=max_, step=step
+            )
+            cg.add(var.set_parent(parent))
+            cg.add(var.set_kind(kind))
+            cg.add(var.set_aux(aux, index))
+            cg.add(var.set_cell(cell, nbytes))
+            cg.add(parent.register_listener(var))
+            cg.add(parent.enable_aux(aux))

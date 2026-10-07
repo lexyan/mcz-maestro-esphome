@@ -677,11 +677,58 @@ select:
 
 - Lecture : `C|RecuperoParametriExtra|11`, envoyée au démarrage, après une écriture, puis toutes les 10 minutes. La réponse est une trame de type `03`, en hexadécimal : `03|<air>|<pellets>|<entrée ambiance>|<délai éco-stop>|<hystérésis>`.
 - Écriture : `C|WriteBancaDati|<cellule>|1|<valeur sur 2 chiffres hexadécimaux>`. Exemple : `C|WriteBancaDati|459|1|03` règle la recette air sur +1.
-- Ces commandes ne sont envoyées que si l'une des deux listes est déclarée.
+- La lecture n'est envoyée que si une entité qui en dépend est déclarée.
 - Une recette est écrite dans la banque de données du poêle, c'est-à-dire ses paramètres, probablement en mémoire permanente : la modifier à la main, pas depuis une automatisation répétitive.
 - Les libellés se traduisent avec `options`, comme pour les autres listes.
 - Dans une lambda, `write_database(cellule, octets, valeur)` écrit une cellule de la banque de données.
 - Le format vient des sources de l'application MCZ ; il **n'a pas encore été testé sur un poêle**.
+
+### Réglages et informations complémentaires
+
+Ces entités reprennent des menus de l'application MCZ. Elles sont lues par d'autres trames que la trame d'information ; une trame n'est demandée que si une entité qui en dépend est déclarée.
+
+**Réglages** (catégorie configuration)
+
+| Plateforme | Clé | Contenu | Écriture |
+|---|---|---|---|
+| `number` | `eco_stop_delay` | Eco stop : délai avant l'arrêt, 1 à 30 minutes | cellule 148, 2 octets, en secondes |
+| `number` | `eco_stop_hysteresis` | Eco stop : écart sous la consigne pour le redémarrage, 2 à 5 °C | cellule 294 |
+| `select` | `room_input` | Entrée ambiance : sonde WiFi (255), thermostat (0) ou sonde du poêle (1) | cellule 356 |
+| `select` | `wifi_probe_interval` | Intervalle d'envoi de la sonde WiFi : 10, 15 ou 20 minutes | paramètre 110 |
+| `select` | `wifi_probe_summer_interval` | Intervalle d'envoi en mode été : 45, 60, 90 ou 120 minutes | paramètre 111 |
+| `select` | `wifi_probe_offset` | Décalage de la sonde WiFi, -5 à +5 °C | paramètre 144 |
+
+**Informations** (lecture seule, catégorie diagnostic)
+
+| Plateforme | Clé | Contenu |
+|---|---|---|
+| `text_sensor` | `last_alarm` | Dernière alarme et sa date |
+| `text_sensor` | `alarm_history` | Cinq dernières alarmes, en forme courte |
+| `text_sensor` | `wifi_probe_last_seen` | Dernière connexion de la sonde WiFi |
+| `sensor` | `wifi_probe_signal` | Signal de la sonde WiFi vu par le poêle, en % |
+| `text_sensor` | `bootloader_version`, `wifi_direct_version`, `wifi_remote_version`, `wifi_probe_version` | Versions du bootloader, des modules WiFi 1 et 2 et de la sonde |
+| `text_sensor` | `database_name`, `database_revision` | Banque de données chargée dans la carte mère |
+| `text_sensor` | `serial_number` | Numéro de série |
+| `sensor` | `setpoint_min`, `setpoint_max` | Bornes de la consigne acceptées par le poêle |
+| `binary_sensor` | `fan_fitted`, `ducted_fan_1_fitted`, `ducted_fan_2_fitted`, `silent_mode_available` | Équipement du poêle |
+
+**Trames lues**
+
+| Contenu | Commande | Type | Lecture |
+|---|---|---|---|
+| Recettes, entrée ambiance, eco stop | `C\|RecuperoParametriExtra\|11` | `03` | Au démarrage, après une écriture, puis toutes les 10 minutes |
+| Équipement et bornes | `C\|RecuperoParametri` | `00` | Une fois |
+| Versions | `C\|RecuperoVersioneSW` | `0E` | Une fois |
+| Sonde WiFi | `C\|RecuperoSondeWiFi` | `0B` | Au démarrage, après une écriture, puis toutes les 10 minutes |
+| Alarmes | `C\|RecuperaAllarmi` | `0A` | Au démarrage, quand une alarme apparaît ou disparaît, puis toutes les 10 minutes |
+
+- Tant qu'une trame n'a pas reçu de réponse, elle est redemandée chaque minute.
+- Choisir « Thermostat » pour l'entrée ambiance passe aussi le poêle en régulation automatique (paramètre 40), comme le fait l'application.
+- La sonde d'origine règle l'entrée ambiance sur « Sonde WiFi » à son appairage : c'est la valeur à garder avec la sonde virtuelle.
+- Les dates sont celles de l'horloge du poêle.
+- La trame des versions contient aussi le nom et le mot de passe du point d'accès du poêle : le composant ne les expose pas et n'écrit pas cette trame dans les logs.
+- L'eco stop et l'entrée ambiance sont écrits dans la banque de données du poêle, comme les recettes : mêmes précautions.
+- Les formats viennent des sources de l'application MCZ ; ils **n'ont pas encore été testés sur un poêle**.
 
 ### Trames brutes
 

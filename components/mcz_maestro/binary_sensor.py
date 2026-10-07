@@ -7,7 +7,7 @@ from esphome.const import (
     ENTITY_CATEGORY_DIAGNOSTIC,
 )
 
-from . import CONF_MCZ_MAESTRO_ID, HUB_CHILD_SCHEMA, mcz_maestro_ns
+from . import AUX_PARAMS, CONF_MCZ_MAESTRO_ID, HUB_CHILD_SCHEMA, mcz_maestro_ns
 
 DEPENDENCIES = ["mcz_maestro"]
 
@@ -54,11 +54,30 @@ BINARY_SENSORS = {
     ),
 }
 
+
+
+def _capability(icon):
+    return binary_sensor.binary_sensor_schema(
+        icon=icon, entity_category=ENTITY_CATEGORY_DIAGNOSTIC
+    )
+
+
+# What the stove is fitted with, read once from the capability frame.
+# key: (frame, index, schema)
+AUX_BINARY_SENSORS = {
+    "fan_fitted": (AUX_PARAMS, 8, _capability("mdi:fan")),
+    "ducted_fan_1_fitted": (AUX_PARAMS, 14, _capability("mdi:fan")),
+    "ducted_fan_2_fitted": (AUX_PARAMS, 20, _capability("mdi:fan")),
+    "silent_mode_available": (AUX_PARAMS, 30, _capability("mdi:volume-off")),
+}
+
 # True while the mainboard answers on the serial link
 CONF_LINK = "link"
 
 CONFIG_SCHEMA = HUB_CHILD_SCHEMA.extend(
     {cv.Optional(key): item[4] for key, item in BINARY_SENSORS.items()}
+).extend(
+    {cv.Optional(key): item[2] for key, item in AUX_BINARY_SENSORS.items()}
 ).extend(
     {
         cv.Optional(CONF_LINK): binary_sensor.binary_sensor_schema(
@@ -75,6 +94,10 @@ async def to_code(config):
         if conf := config.get(key):
             sens = await binary_sensor.new_binary_sensor(conf)
             cg.add(parent.register_binary_sensor(sens, field, mode, a, b))
+    for key, (kind, index, _) in AUX_BINARY_SENSORS.items():
+        if conf := config.get(key):
+            sens = await binary_sensor.new_binary_sensor(conf)
+            cg.add(parent.register_aux_binary_sensor(sens, kind, index))
     if conf := config.get(CONF_LINK):
         sens = await binary_sensor.new_binary_sensor(conf)
         cg.add(parent.set_link_binary_sensor(sens))

@@ -26,6 +26,13 @@ CONF_PROBE = "probe"
 CONF_REQUIRE_API = "require_api"
 
 mcz_maestro_ns = cg.esphome_ns.namespace("mcz_maestro")
+# Frames read in addition to the information frame (see MczAuxKind in mcz_maestro.h)
+MczAuxKind = mcz_maestro_ns.enum("MczAuxKind")
+AUX_EXTRA = MczAuxKind.AUX_EXTRA
+AUX_PARAMS = MczAuxKind.AUX_PARAMS
+AUX_VERSIONS = MczAuxKind.AUX_VERSIONS
+AUX_PROBES = MczAuxKind.AUX_PROBES
+AUX_ALARMS = MczAuxKind.AUX_ALARMS
 MczMaestro = mcz_maestro_ns.class_(
     "MczMaestro", cg.PollingComponent, uart.UARTDevice
 )

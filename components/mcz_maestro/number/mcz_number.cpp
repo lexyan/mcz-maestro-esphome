@@ -23,18 +23,35 @@ void MczNumber::control(float value) {
       }
       raw = (int) lroundf(value) + 10;
       break;
+    case NUMBER_MINUTES:
+      raw = (int) lroundf(value) * 60;
+      break;
     default:
       raw = (int) lroundf(value);
       break;
+  }
+  if (this->cell_ != 0) {
+    // The state is published when the stove reports the new value
+    this->parent_->write_database(this->cell_, this->cell_bytes_, (uint32_t) raw);
+    return;
   }
   if (this->parent_->write_parameter(this->param_, raw) && this->field_ == MCZ_NO_FIELD)
     this->publish_state(value);  // no read-back available: last value sent
 }
 
 void MczNumber::on_info(const MczInfo &info) {
-  if (!info.has(this->field_))
+  if (this->field_ == MCZ_NO_FIELD || !info.has(this->field_))
     return;
-  uint32_t raw = info.get(this->field_);
+  this->publish_raw_(info.get(this->field_));
+}
+
+void MczNumber::on_aux(MczAuxKind kind, const MczValues &values) {
+  if (this->aux_index_ == MCZ_NO_FIELD || kind != this->aux_kind_ || !values.has(this->aux_index_))
+    return;
+  this->publish_raw_(values.get(this->aux_index_));
+}
+
+void MczNumber::publish_raw_(uint32_t raw) {
   if ((int32_t) raw == this->last_)
     return;
   this->last_ = (int32_t) raw;
@@ -49,6 +66,9 @@ void MczNumber::on_info(const MczInfo &info) {
     case NUMBER_POWER:
       if (value > 10)
         value -= 10;
+      break;
+    case NUMBER_MINUTES:
+      value = roundf(value / 60.0f);
       break;
     default:
       break;
