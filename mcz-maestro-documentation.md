@@ -428,6 +428,12 @@ esptool --port COM3 write-flash --flash-mode dout --flash-size 2MB 0x0 backup-wi
 
 Fichier : `mcz-poele.yaml`. Il remplace le firmware du module WiFi 2 (cloud). Le module WiFi 1 (local) n'est pas modifié : l'application en mode direct et le point d'accès du poêle continuent de fonctionner.
 
+### Composant externe `mcz_maestro`
+
+La même configuration existe sous forme de composant ESPHome, dans le dossier `components/mcz_maestro` du dépôt. Avec lui, on ne déclare que les entités voulues : celles qui ne sont pas listées ne sont ni compilées ni exposées, ce qui remplace le réglage `internal` décrit plus bas. Les options et la liste des entités sont dans le `README.md` ; `examples/full.yaml` montre toutes les entités et `examples/mcz-ego2-fr.yaml` reprend la configuration de ce document.
+
+Le protocole, les sécurités et la sonde virtuelle décrits ci-dessous s'appliquent aux deux formes.
+
 ### Principe
 
 - Le module se connecte au WiFi de la maison et à Home Assistant par l'API native d'ESPHome.

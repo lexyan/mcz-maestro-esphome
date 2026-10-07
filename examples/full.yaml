@@ -1,0 +1,263 @@
+# Every option of the mcz_maestro component. Keep only what your stove has.
+#
+# Nothing is exposed unless it is declared here: an entity that is not listed
+# is neither compiled nor sent to Home Assistant.
+
+esphome:
+  name: mcz-stove
+  friendly_name: MCZ stove
+
+esp8266:
+  board: esp_wroom_02       # ESP8266 with 2 MB of flash, as on the MCZ WiFi board
+
+external_components:
+  - source: github://lexyan/mcz-maestro-esphome
+    components: [ mcz_maestro ]
+
+# The main serial link is wired to the stove mainboard: no logs on it
+logger:
+  baud_rate: 0
+
+api:
+  encryption:
+    key: !secret esphome_encryption_key
+  actions:
+    # Send a raw frame, without the final ^. Example: C|WriteParametri|42|43
+    - action: send_command
+      variables:
+        command: string
+      then:
+        - lambda: 'id(stove).send_command(command);'
+
+ota:
+  - platform: esphome
+    encryption:
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+time:
+  - platform: homeassistant
+    id: ha_time
+
+uart:
+  tx_pin: GPIO1
+  rx_pin: GPIO3
+  baud_rate: 115200
+  rx_buffer_size: 1024
+
+preferences:
+  flash_write_interval: never
+
+mcz_maestro:
+  id: stove
+  update_interval: 15s
+  # language: en            # texts of the text sensors: en (default) or fr
+  # announce: true          # announce the module to the mainboard at start-up
+  # module_version: "1.2.6"
+  # write_guard: 20s        # no write to the stove during this delay after boot
+  time_id: ha_time          # needed by the set_time button
+  virtual_probe:            # optional: replaces the remote WiFi room probe
+    temperature_sensor: room_temperature
+    probe: 1                # 1, 2 or 3
+    # version: "1.9.9"
+    # require_api: true     # send only while Home Assistant is connected
+
+climate:
+  - platform: mcz_maestro
+    name: "Thermostat"
+    # manual_preset: "Manual"
+    # auto_preset: "Auto"
+
+sensor:
+  # Source of the virtual probe
+  - platform: homeassistant
+    id: room_temperature
+    entity_id: sensor.living_room_temperature
+    internal: true
+
+  - platform: mcz_maestro
+    ambient_temperature:
+      name: "Room temperature"
+    fume_temperature:
+      name: "Flue gas temperature"
+    power_level:
+      name: "Power level"
+    state_code:
+      name: "State code"
+    board_temperature:
+      name: "Mainboard temperature"
+    fume_fan_rpm:
+      name: "Flue gas extractor"
+    auger_rpm:
+      name: "Auger"
+    auger_rpm_set:
+      name: "Auger setpoint"
+    active_set:
+      name: "Active setpoint"
+    active_live:
+      name: "Active measured"
+    active_temperature:
+      name: "Active temperature"
+    profile:
+      name: "Profile"
+    total_hours:
+      name: "Operating hours"
+    hours_power_1:
+      name: "Operating hours power 1"
+    hours_power_2:
+      name: "Operating hours power 2"
+    hours_power_3:
+      name: "Operating hours power 3"
+    hours_power_4:
+      name: "Operating hours power 4"
+    hours_power_5:
+      name: "Operating hours power 5"
+    hours_to_service:
+      name: "Hours before service"
+    ignitions:
+      name: "Ignitions"
+    minutes_to_switch_off:
+      name: "Minutes to switch-off"
+    virtual_probe_temperature:
+      name: "Virtual probe temperature sent"
+    virtual_probe_interval:
+      name: "Virtual probe interval"
+    wifi_probe_1:
+      name: "WiFi probe 1"
+    wifi_probe_2:
+      name: "WiFi probe 2"
+    wifi_probe_3:
+      name: "WiFi probe 3"
+    # Hydro stoves, boiler
+    puffer_temperature:
+      name: "Buffer tank temperature"
+    boiler_temperature:
+      name: "Boiler temperature"
+    ntc3_temperature:
+      name: "NTC3 temperature"
+    return_temperature:
+      name: "Return temperature"
+    pump_pwm:
+      name: "Pump PWM"
+    # Pellet level sensor: 0 = no sensor, 10 = level OK, 11 = empty
+    pellet_sensor_code:
+      name: "Pellet sensor code"
+    # Raw values, meaning not documented
+    modbus_address:
+      name: "Modbus address"
+    database_id:
+      name: "Database ID"
+    field_51:
+      name: "Field 51"
+    field_55:
+      name: "Field 55"
+    set_puffer:
+      name: "Field 56"
+    set_boiler:
+      name: "Field 57"
+    set_health:
+      name: "Field 58"
+
+binary_sensor:
+  - platform: mcz_maestro
+    alarm:
+      name: "Alarm"
+    brazier_dirty:
+      name: "Brazier needs cleaning"
+    igniter:
+      name: "Igniter"
+    link:
+      name: "Mainboard link"
+    pellet_empty:
+      name: "Pellet tank empty"
+
+text_sensor:
+  - platform: mcz_maestro
+    state:
+      name: "State"
+    datetime:
+      name: "Stove date and time"
+    firmware:
+      name: "Mainboard firmware"
+    valve_3way:
+      name: "3-way valve"
+    pellet_level:
+      name: "Pellet level"
+
+switch:
+  - platform: mcz_maestro
+    power:
+      name: "Power"
+    eco_mode:
+      name: "Eco mode"
+    silent_mode:
+      name: "Silent mode"
+    active_mode:
+      name: "Active mode"
+    chronothermostat:
+      name: "Chronothermostat"
+    sounds:
+      name: "Sounds"
+    virtual_probe:
+      name: "Virtual probe"
+    # Untested
+    pellet_sensor:
+      name: "Pellet sensor"
+    summer_mode:
+      name: "Summer mode"
+
+select:
+  - platform: mcz_maestro
+    control_mode:
+      name: "Regulation mode"
+      # Labels can be translated; the keys are the values sent to the stove
+      # options: { 0: "Manual", 1: "Auto" }
+    fan:
+      name: "Fan"
+      # options: { 0: "Off", 1: "1", 2: "2", 3: "3", 4: "4", 5: "5", 6: "Auto" }
+    ducted_fan_1:
+      name: "Ducted fan 1"
+    ducted_fan_2:
+      name: "Ducted fan 2"
+
+number:
+  - platform: mcz_maestro
+    setpoint:
+      name: "Setpoint"
+    power:
+      name: "Power setting"
+    # Hydro stoves
+    boiler_setpoint:
+      name: "Boiler setpoint"
+    # No read-back from the stove
+    chrono_t1:
+      name: "Chronothermostat T1"
+    chrono_t2:
+      name: "Chronothermostat T2"
+    chrono_t3:
+      name: "Chronothermostat T3"
+    # Raw values, untested
+    profile:
+      name: "Profile setting"
+    temperature_unit:
+      name: "Temperature unit code"
+    sleep:
+      name: "Sleep code"
+    antifreeze:
+      name: "Antifreeze code"
+
+button:
+  - platform: mcz_maestro
+    refresh:
+      name: "Refresh"
+    reset_alarm:
+      name: "Acknowledge alarm"
+    set_time:
+      name: "Set stove clock"
+    # Untested. load_auger feeds pellets: stove off and cold only
+    reset_active:
+      name: "Reset Active"
+    load_auger:
+      name: "Load auger"

@@ -1,4 +1,4 @@
-# MCZ Maestro stove — ESPHome firmware and protocol notes
+# MCZ Maestro stove — ESPHome component and protocol notes
 
 *[Version française de la documentation](mcz-maestro-documentation.md)*
 
@@ -18,12 +18,123 @@ existing serial link.
 - Stove state, alarms, temperatures, operating hours and other diagnostics
 - A "virtual probe" that feeds any Home Assistant temperature sensor to the
   stove in place of the MCZ remote WiFi probe
+- Optional entities for hydro stoves, boiler, second ducted fan and pellet sensor
+
+## The `mcz_maestro` component
+
+You declare only the entities your stove has; nothing else is compiled.
+
+```yaml
+external_components:
+  - source: github://lexyan/mcz-maestro-esphome
+    components: [ mcz_maestro ]
+
+logger:
+  baud_rate: 0              # the serial link is wired to the stove
+
+uart:
+  tx_pin: GPIO1
+  rx_pin: GPIO3
+  baud_rate: 115200
+
+mcz_maestro:
+  id: stove
+
+climate:
+  - platform: mcz_maestro
+    name: "Thermostat"
+
+sensor:
+  - platform: mcz_maestro
+    ambient_temperature:
+      name: "Room temperature"
+    fume_temperature:
+      name: "Flue gas temperature"
+
+text_sensor:
+  - platform: mcz_maestro
+    state:
+      name: "State"
+
+select:
+  - platform: mcz_maestro
+    fan:
+      name: "Fan"
+```
+
+### Component options
+
+| Option | Default | Role |
+|---|---|---|
+| `update_interval` | `15s` | Polling period of the mainboard |
+| `language` | `en` | Language of the text sensors: `en` or `fr` |
+| `announce` | `true` | Announce the module to the mainboard at start-up, like the original firmware |
+| `module_version` | `1.2.6` | Version sent in that announcement |
+| `write_guard` | `20s` | No parameter is written to the stove during this delay after boot |
+| `time_id` | | Time source used by the `set_time` button |
+| `virtual_probe` | | Replaces the remote WiFi probe (see below) |
+
+```yaml
+mcz_maestro:
+  id: stove
+  time_id: ha_time
+  virtual_probe:
+    temperature_sensor: room_temperature   # id of any ESPHome sensor
+    probe: 1                               # 1, 2 or 3
+```
+
+### Entities
+
+| Platform | Keys |
+|---|---|
+| `climate` | one thermostat; `manual_preset` and `auto_preset` set the preset labels |
+| `sensor` | `ambient_temperature`, `fume_temperature`, `power_level`, `state_code`, `board_temperature`, `fume_fan_rpm`, `auger_rpm`, `auger_rpm_set`, `active_set`, `active_live`, `active_temperature`, `profile`, `total_hours`, `hours_power_1` … `hours_power_5`, `hours_to_service`, `ignitions`, `minutes_to_switch_off`, `wifi_probe_1` … `wifi_probe_3`, `virtual_probe_temperature`, `virtual_probe_interval` |
+| `sensor` (hydro, pellet sensor, raw) | `puffer_temperature`, `boiler_temperature`, `ntc3_temperature`, `return_temperature`, `pump_pwm`, `pellet_sensor_code`, `modbus_address`, `database_id`, `field_51`, `field_55`, `set_puffer`, `set_boiler`, `set_health` |
+| `binary_sensor` | `alarm`, `brazier_dirty`, `igniter`, `link`, `pellet_empty` |
+| `text_sensor` | `state`, `datetime`, `firmware`, `valve_3way`, `pellet_level` |
+| `switch` | `power`, `eco_mode`, `silent_mode`, `active_mode`, `chronothermostat`, `sounds`, `virtual_probe`, `pellet_sensor`, `summer_mode` |
+| `select` | `control_mode`, `fan`, `ducted_fan_1`, `ducted_fan_2` |
+| `number` | `setpoint`, `power`, `boiler_setpoint`, `chrono_t1` … `chrono_t3`, `profile`, `temperature_unit`, `sleep`, `antifreeze` |
+| `button` | `refresh`, `reset_alarm`, `set_time`, `reset_active`, `load_auger` |
+
+The labels of a `select` can be translated; the keys are the values sent to the stove:
+
+```yaml
+select:
+  - platform: mcz_maestro
+    control_mode:
+      name: "Mode de régulation"
+      options: { 0: "Manuel", 1: "Automatique" }
+```
+
+From a lambda, `id(stove).send_command("C|RecuperoInfo")` sends a raw frame and
+`id(stove).write_parameter(42, 43)` writes a parameter.
+
+Complete configurations: [`examples/full.yaml`](examples/full.yaml) (every option)
+and [`examples/mcz-ego2-fr.yaml`](examples/mcz-ego2-fr.yaml) (the stove this was built on, in French).
+
+### Safeguards
+
+- Nothing is written to the stove at start-up: every state comes from the stove.
+- Writes are refused during `write_guard` after boot.
+- The power setting is refused while the stove is in automatic mode.
+- `load_auger` feeds pellets into the brazier: stove off and cold only.
+
+### Status
+
+Tested on an MCZ Ego 2 (mainboard firmware 1.8.2, no hydro module, one ducted fan).
+The entities for hydro stoves, the boiler, the second ducted fan and the pellet
+sensor come from the maestrogateway tables and have **not** been tested on a
+stove that has them. Diagnostic commands (`C|Diagnostica`) and the factory reset
+are deliberately not exposed.
 
 ## Repository contents
 
 | Path | Content |
 |---|---|
-| `mcz-poele.yaml` | ESPHome configuration for the cloud WiFi module |
+| `components/mcz_maestro/` | The ESPHome external component |
+| `examples/` | Example configurations using the component |
+| `mcz-poele.yaml` | Earlier single-file configuration, without the component |
 | `mcz-maestro-documentation.en.md` | Full documentation (English) |
 | `mcz-maestro-documentation.md` | Full documentation (French) |
 | `esp8266_split.py` | Splits an ESP8266 flash dump into its regions |
@@ -32,17 +143,12 @@ existing serial link.
 ## Quick start
 
 1. Back up the original firmware of the module (see the documentation, part 5).
-2. Adapt the substitutions at the top of `mcz-poele.yaml` and create `secrets.yaml`.
+2. Start from one of the files in `examples/` and create `secrets.yaml`.
 3. Compile with ESPHome and flash the module with esptool.
 4. Add the device to Home Assistant.
 
 The wiring, the esptool commands and the way back to the original firmware
 are described in the [documentation](mcz-maestro-documentation.en.md).
-
-## Tested on
-
-MCZ Ego 2, mainboard firmware 1.8.2, no hydro module, one ducted fan.
-Other Maestro stoves use the same protocol but may expose other fields.
 
 ## Credits
 

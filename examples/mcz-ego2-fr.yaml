@@ -1,0 +1,229 @@
+# Poêle MCZ Ego 2 (une ventilation canalisée, pas de module hydro), entités en français.
+#
+# Équivalent du fichier mcz-poele.yaml, écrit avec le composant mcz_maestro :
+# seules les entités déclarées ici sont compilées et exposées dans Home Assistant.
+# Voir examples/full.yaml pour la liste complète des entités disponibles.
+#
+# secrets.yaml attendu : wifi_ssid, wifi_password, esphome_encryption_key, ap_wifi_password
+
+substitutions:
+  name: mcz-ego2
+  friendly_name: Poêle MCZ Ego 2
+  reboot_timeout: 14d
+  # Capteur Home Assistant envoyé au poêle à la place de la sonde WiFi déportée
+  room_temp_entity: sensor.snzb_02d_temperature_6_rec
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+
+esp8266:
+  board: esp_wroom_02          # ESP8266 générique avec 2 Mo de flash
+
+external_components:
+  - source: github://lexyan/mcz-maestro-esphome
+    components: [ mcz_maestro ]
+  # Pour utiliser une copie locale du dossier components :
+  # - source: { type: local, path: components }
+
+preferences:
+  flash_write_interval: never
+
+# La liaison série principale est réservée au poêle : pas de logs dessus
+logger:
+  baud_rate: 0
+  level: DEBUG
+
+api:
+  reboot_timeout: ${reboot_timeout}
+  encryption:
+    key: !secret esphome_encryption_key
+  actions:
+    # Envoi d'une trame brute depuis Home Assistant, sans le ^ final.
+    # Exemple : C|WriteParametri|42|43   (consigne à 21,5 degrés)
+    - action: send_command
+      variables:
+        command: string
+      then:
+        - lambda: 'id(stove).send_command(command);'
+
+ota:
+  - platform: esphome
+    encryption:              # vide : utilise la clé de chiffrement de l'API
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  reboot_timeout: ${reboot_timeout}
+  ap:
+    ssid: ${name}-secours
+    password: !secret ap_wifi_password
+
+captive_portal:
+
+time:
+  - platform: homeassistant
+    id: ha_time
+
+uart:
+  tx_pin: GPIO1
+  rx_pin: GPIO3
+  baud_rate: 115200
+  rx_buffer_size: 1024
+
+# LED d'état sur GPIO13, active à l'état bas
+status_led:
+  pin:
+    number: GPIO13
+    inverted: true
+
+mcz_maestro:
+  id: stove
+  update_interval: 15s
+  language: fr
+  time_id: ha_time
+  virtual_probe:
+    temperature_sensor: ha_room_temp
+    probe: 1                 # 1, 2 ou 3
+
+climate:
+  - platform: mcz_maestro
+    name: "Thermostat"
+    manual_preset: "Manuel"
+    auto_preset: "Automatique"
+
+sensor:
+  - platform: homeassistant
+    id: ha_room_temp
+    entity_id: ${room_temp_entity}
+    internal: true
+  - platform: wifi_signal
+    name: "Signal WiFi"
+    update_interval: 60s
+    entity_category: diagnostic
+
+  - platform: mcz_maestro
+    ambient_temperature:
+      name: "Température ambiante"
+    fume_temperature:
+      name: "Température fumées"
+    power_level:
+      name: "Puissance"
+    state_code:
+      name: "État (code)"
+    board_temperature:
+      name: "Température carte mère"
+    fume_fan_rpm:
+      name: "Extracteur fumées"
+      unit_of_measurement: "tr/min"
+    auger_rpm:
+      name: "Vis sans fin"
+      unit_of_measurement: "tr/min"
+    auger_rpm_set:
+      name: "Vis sans fin (consigne)"
+      unit_of_measurement: "tr/min"
+    active_set:
+      name: "Active (consigne)"
+    active_live:
+      name: "Active (mesure)"
+    active_temperature:
+      name: "Active (température)"
+    profile:
+      name: "Profil"
+    total_hours:
+      name: "Heures de fonctionnement"
+    hours_power_1:
+      name: "Heures de fonctionnement Puissance 1"
+    hours_power_2:
+      name: "Heures de fonctionnement Puissance 2"
+    hours_power_3:
+      name: "Heures de fonctionnement Puissance 3"
+    hours_power_4:
+      name: "Heures de fonctionnement Puissance 4"
+    hours_power_5:
+      name: "Heures de fonctionnement Puissance 5"
+    hours_to_service:
+      name: "Heures avant entretien"
+    ignitions:
+      name: "Nombre d'allumages"
+    virtual_probe_temperature:
+      name: "Sonde virtuelle - température envoyée"
+    virtual_probe_interval:
+      name: "Sonde virtuelle - intervalle demandé"
+    wifi_probe_1:
+      name: "Sonde WiFi 1 (lue par le poêle)"
+
+binary_sensor:
+  - platform: mcz_maestro
+    alarm:
+      name: "Alarme"
+    brazier_dirty:
+      name: "Brasier à nettoyer"
+    igniter:
+      name: "Bougie"
+    link:
+      name: "Liaison carte mère"
+
+text_sensor:
+  - platform: mcz_maestro
+    state:
+      name: "État"
+    datetime:
+      name: "Date et heure du poêle"
+    firmware:
+      name: "Firmware carte mère"
+
+switch:
+  - platform: mcz_maestro
+    power:
+      name: "Marche"
+    eco_mode:
+      name: "Mode éco"
+    silent_mode:
+      name: "Mode silencieux"
+    active_mode:
+      name: "Mode Active"
+    chronothermostat:
+      name: "Chronothermostat"
+    sounds:
+      name: "Sons"
+    virtual_probe:
+      name: "Sonde virtuelle"
+
+  # LED sur GPIO12, active à l'état bas : forcée à 0 au démarrage, donc allumée
+  - platform: gpio
+    pin: GPIO12
+    id: led_gpio12
+    internal: true
+    restore_mode: ALWAYS_OFF
+
+select:
+  - platform: mcz_maestro
+    control_mode:
+      name: "Mode de régulation"
+      options: { 0: "Manuel", 1: "Automatique" }
+    fan:
+      name: "Ventilation"
+      options: { 0: "No Air", 1: "1", 2: "2", 3: "3", 4: "4", 5: "5", 6: "Automatique" }
+    ducted_fan_1:
+      name: "Ventilation canalisée"
+      options: { 0: "No Air", 1: "1", 2: "2", 3: "3", 4: "4", 5: "5", 6: "Automatique" }
+
+number:
+  - platform: mcz_maestro
+    setpoint:
+      name: "Consigne"
+    power:
+      name: "Puissance (réglage)"
+
+button:
+  - platform: mcz_maestro
+    refresh:
+      name: "Actualiser"
+    reset_alarm:
+      name: "Acquitter l'alarme"
+    set_time:
+      name: "Régler l'heure du poêle"
+  - platform: restart
+    name: "Redémarrer le module"
+    entity_category: diagnostic
