@@ -446,6 +446,7 @@ File: `mcz-poele.yaml`. It replaces the firmware of WiFi module 2 (cloud). WiFi 
 | `reboot_timeout` | Delay before restarting without WiFi or without Home Assistant |
 | `update_interval` | Period of the WiFi signal sensor |
 | `room_temp_entity` | Home Assistant sensor used by the virtual probe |
+| `probe_id` | Number of the simulated WiFi probe: `51`, `52` or `53` for probes 1 to 3 |
 
 Secrets expected in `secrets.yaml`: `wifi_ssid`, `wifi_password`, `esphome_encryption_key`, `ap_wifi_password`. OTA updates are encrypted with the API key.
 
@@ -510,6 +511,39 @@ Secrets expected in `secrets.yaml`: `wifi_ssid`, `wifi_password`, `esphome_encry
 - WiFi signal
 - Refresh and restart-module buttons
 
+**Internal entities (depending on the stove configuration)**
+
+Everything the mainboard exposes is declared in the file. Whatever depends on the stove configuration (hydro, boiler, second ducted fan, pellet sensor…) is set to `internal: true`: the value is decoded, but the entity does not appear in Home Assistant. Set `internal` to `false` on the entities that apply to your stove.
+
+| Entity | Type | Field read | Parameter written |
+|---|---|---|---|
+| Ventilation canalisée 2 (ducted fan 2) | Select: No Air / 1 to 5 / Automatique | 4 | 39 |
+| Température ballon tampon (buffer tank temperature) | Sensor, ÷ 2 | 7 | |
+| Température ballon sanitaire (boiler temperature) | Sensor, ÷ 2 | 8 | |
+| Température sonde NTC3 (NTC3 probe temperature) | Sensor, ÷ 2 | 9 | |
+| Température retour (return temperature) | Sensor, ÷ 2 | 59 | |
+| Vanne 3 voies (3-way valve) | Text: Sanitaire (1) / Chauffage | 15 | |
+| Pompe (PWM) (pump) | Sensor, raw value | 16 | |
+| Consigne ballon (boiler setpoint) | Number, temperature × 2 | 27 | 51 |
+| Minutes avant extinction (minutes to switch-off) | Sensor | 44 | |
+| Niveau de pellets, Réservoir de pellets vide, Capteur de pellets (code) (pellet level) | Text, binary, sensor: 0 = no sensor, 10 = enough pellets, 11 = empty | 47 | |
+| Capteur de pellets (pellet sensor) | Switch | 47 | 148 |
+| Sonde WiFi 2 and 3 (as read back by the stove) | Sensor, ÷ 2 | 53, 54 | |
+| Chronothermostat T1, T2, T3 | Number, temperature × 2, no read-back | | 1108, 1109, 1110 |
+| Mode été (summer mode) | Switch, no read-back | | 58 |
+| Profil (réglage) (profile setting) | Number, raw value | 18 | 149 |
+| Unité de température (code) (temperature unit) | Number, raw value | 48 | 49 |
+| Sleep (code) | Number, raw value | 50 | 57 |
+| Antigel (code) (antifreeze) | Number, raw value | 60 | 154 |
+| Réinitialiser Active (reset Active) | Button | | 2 = `255` |
+| Charger la vis sans fin (load the auger) | Button | | 34 = `49` |
+| Modbus address, database ID, Mode (field 51), field 55, settings (fields 56 to 58) | Sensors, raw value | 19, 31, 51, 55, 56 to 58 | |
+
+- These entities come from the maestrogateway table and **have not been tested**: the stove studied has none of these options.
+- For the optional temperatures, the value `255` is treated as "probe absent".
+- The "Charger la vis sans fin" button feeds pellets into the brazier: use it only with the stove off and cold.
+- Deliberately not declared: the diagnostic commands (`C|Diagnostica|…`, direct control of the extractor, the auger, the igniter, the fans, the pump and the valve) and the factory reset (parameter 46). They remain reachable through the `send_command` action.
+
 ### Thermostat
 
 The "Thermostat" entity groups on/off, the setpoint and the room temperature in a Home Assistant thermostat card.
@@ -558,7 +592,7 @@ data:
 
 It replaces the remote room probe with a Home Assistant sensor.
 
-- Frame sent: `C|RecuperaTemperaturaWiFi|51|<T × 2>|<version>|00|<WiFi quality>`. The `51` designates probe 1; probes 2 and 3 would use `52` and `53`.
+- Frame sent: `C|RecuperaTemperaturaWiFi|<probe>|<T × 2>|<version>|00|<WiFi quality>`. The probe number comes from the `probe_id` substitution: `51` for probe 1 (default), `52` and `53` for probes 2 and 3.
 - The temperature is rounded to the nearest half degree (23.3 °C is sent as 23.5 °C), which avoids the downward bias of truncation.
 - First transmission 30 seconds after startup, then at the interval returned by the stove, bounded between 1 and 30 minutes.
 - Nothing is sent if the sensor is unavailable or if Home Assistant cannot be reached.

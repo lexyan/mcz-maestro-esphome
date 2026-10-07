@@ -6,6 +6,11 @@
 #   reponse : champs hexadecimaux separes par | et termines par ^
 # La table des champs et des commandes vient du projet Chibald/maestrogateway.
 #
+# Toutes les donnees de la trame d'information et tous les parametres connus sont
+# declares. Ceux qui dependent de la configuration du poele (hydro, ballon, 2e
+# canalisation, capteur de pellets...) sont en "internal: true" : ils sont decodes mais
+# pas exposes dans Home Assistant. Passer "internal" a false pour les faire apparaitre.
+#
 # secrets.yaml attendu : wifi_ssid, wifi_password, esphome_encryption_key, ap_wifi_password
 
 substitutions:
@@ -16,6 +21,8 @@ substitutions:
   update_interval: 60s
   # Capteur Home Assistant envoye au poele a la place de la sonde WiFi deportee
   room_temp_entity: sensor.snzb_02d_temperature_6_rec
+  # Numero de la sonde WiFi simulee : 51 = sonde 1, 52 = sonde 2, 53 = sonde 3
+  probe_id: "51"
 
 preferences:
   flash_write_interval: never
@@ -153,8 +160,8 @@ interval:
           cmd: "C|RecuperoInfo"
 
   # Sonde virtuelle : envoie la temperature de Home Assistant a la place de la sonde WiFi.
-  # Meme trame que la sonde d'origine : C|RecuperaTemperaturaWiFi|51|<T x 2>|1.9.9|00|<qualite WiFi>
-  # Le 51 designe la sonde 1 ; les sondes 2 et 3 utilisent 52 et 53.
+  # Meme trame que la sonde d'origine : C|RecuperaTemperaturaWiFi|<sonde>|<T x 2>|1.9.9|00|<qualite WiFi>
+  # Le numero de sonde vient de la substitution probe_id (51, 52 ou 53 pour les sondes 1 a 3).
   - interval: 10s
     then:
       - if:
@@ -174,7 +181,7 @@ interval:
                 int quality = std::isnan(rssi) ? 100 : (rssi <= -100 ? 0 : (rssi >= -50 ? 100 : 2 * ((int) rssi + 100)));
                 int half = (int) lroundf(t * 2);         // arrondi au demi-degre le plus proche
                 char buf[64];
-                snprintf(buf, sizeof(buf), "C|RecuperaTemperaturaWiFi|51|%d|1.9.9|00|%d", half, quality);
+                snprintf(buf, sizeof(buf), "C|RecuperaTemperaturaWiFi|${probe_id}|%d|1.9.9|00|%d", half, quality);
                 id(tx_queue).push_back(buf);
                 id(probe_last_send) = millis();
                 id(probe_sent).publish_state(half / 2.0f);
@@ -305,6 +312,7 @@ interval:
             };
             if (has(2)) { const char *o = fan_option((int) num(2)); if (o) id(sel_fan).publish_state(o); }
             if (has(3)) { const char *o = fan_option((int) num(3)); if (o) id(sel_ducted1).publish_state(o); }
+            if (has(4)) { const char *o = fan_option((int) num(4)); if (o) id(sel_ducted2).publish_state(o); }
             if (has(5))  id(fume_temp).publish_state(num(5));
             if (has(6))  id(ambient_temp).publish_state(num(6) / 2.0f);
             if (has(12)) id(fume_fan_rpm).publish_state(num(12));
@@ -322,6 +330,7 @@ interval:
             }
             if (has(17)) id(brazier_dirty).publish_state(num(17) != 0);
             if (has(18)) id(profile).publish_state(num(18));
+            if (has(18)) id(num_profile).publish_state(num(18));
             if (has(20)) id(sw_active).publish_state(num(20) != 0);
             if (has(22)) {                       // mode de regulation : 0 = manuel, 1 = automatique
               int cm = (int) num(22);
@@ -367,6 +376,38 @@ interval:
             if (has(45)) id(ignitions).publish_state(num(45));
             if (has(49)) id(sw_sound).publish_state(num(49) != 0);
             if (has(52)) id(probe_readback).publish_state(num(52) / 2.0f);
+
+            // --- Donnees dependant de la configuration du poele (entites internes) ---
+            // Temperatures optionnelles : 255 = sonde absente
+            auto temp_opt = [&](size_t i) { float v = num(i); return v == 255 ? NAN : v / 2.0f; };
+            if (has(7))  id(puffer_temp).publish_state(temp_opt(7));
+            if (has(8))  id(boiler_temp).publish_state(temp_opt(8));
+            if (has(9))  id(ntc3_temp).publish_state(temp_opt(9));
+            if (has(15)) id(valve_3way).publish_state(num(15) == 1 ? "Sanitaire" : "Chauffage");
+            if (has(16)) id(pump_pwm).publish_state(num(16));
+            if (has(19)) id(modbus_addr).publish_state(num(19));
+            if (has(27)) id(num_boiler_setpoint).publish_state(temp_opt(27));
+            if (has(31)) id(database_id).publish_state(num(31));
+            if (has(44)) id(minutes_to_off).publish_state(num(44));
+            if (has(47)) {                       // 0 = pas de capteur, 10 = niveau correct, 11 = reservoir vide
+              int ps = (int) num(47);
+              id(pellet_code).publish_state(ps);
+              id(pellet_state).publish_state(ps == 0 ? "Absent" : ps == 10 ? "Niveau correct"
+                                           : ps == 11 ? "Réservoir vide" : "Inconnu");
+              id(pellet_empty).publish_state(ps == 11);
+              id(sw_pellet_sensor).publish_state(ps != 0);
+            }
+            if (has(48)) id(num_temp_unit).publish_state(num(48));
+            if (has(50)) id(num_sleep).publish_state(num(50));
+            if (has(51)) id(field_mode).publish_state(num(51));
+            if (has(53)) id(probe2_readback).publish_state(num(53) / 2.0f);
+            if (has(54)) id(probe3_readback).publish_state(num(54) / 2.0f);
+            if (has(55)) id(field_55).publish_state(num(55));
+            if (has(56)) id(set_puffer).publish_state(num(56));
+            if (has(57)) id(set_boiler).publish_state(num(57));
+            if (has(58)) id(set_health).publish_state(num(58));
+            if (has(59)) id(return_temp).publish_state(temp_opt(59));
+            if (has(60)) id(num_antifreeze).publish_state(num(60));
 
             // Thermostat : publication seulement si quelque chose a change
             if (cl_changed || cl->mode != cl_mode || cl->action != cl_action ||
@@ -540,6 +581,108 @@ sensor:
     state_class: total_increasing
     accuracy_decimals: 0
     entity_category: diagnostic
+  # --- Donnees dependant de la configuration du poele : internes par defaut ---
+  # Temperatures : valeur / 2, 255 = sonde absente
+  - platform: template
+    id: puffer_temp               # champ 7
+    name: "Température ballon tampon"
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    internal: true
+  - platform: template
+    id: boiler_temp               # champ 8
+    name: "Température ballon sanitaire"
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    internal: true
+  - platform: template
+    id: ntc3_temp                 # champ 9
+    name: "Température sonde NTC3"
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    internal: true
+  - platform: template
+    id: return_temp               # champ 59
+    name: "Température retour"
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    internal: true
+  - platform: template
+    id: pump_pwm                  # champ 16, valeur brute
+    name: "Pompe (PWM)"
+    icon: mdi:pump
+    state_class: measurement
+    accuracy_decimals: 0
+    internal: true
+  - platform: template
+    id: minutes_to_off            # champ 44
+    name: "Minutes avant extinction"
+    unit_of_measurement: "min"
+    accuracy_decimals: 0
+    internal: true
+  - platform: template
+    id: pellet_code               # champ 47 : 0 = pas de capteur, 10 = niveau correct, 11 = vide
+    name: "Capteur de pellets (code)"
+    accuracy_decimals: 0
+    internal: true
+  - platform: template
+    id: probe2_readback           # champ 53
+    name: "Sonde WiFi 2 (lue par le poêle)"
+    unit_of_measurement: "°C"
+    device_class: temperature
+    accuracy_decimals: 1
+    internal: true
+  - platform: template
+    id: probe3_readback           # champ 54
+    name: "Sonde WiFi 3 (lue par le poêle)"
+    unit_of_measurement: "°C"
+    device_class: temperature
+    accuracy_decimals: 1
+    internal: true
+  # Valeurs brutes, dont le sens n'est pas documente
+  - platform: template
+    id: modbus_addr               # champ 19
+    name: "Adresse Modbus"
+    accuracy_decimals: 0
+    internal: true
+  - platform: template
+    id: database_id               # champ 31
+    name: "Identifiant base de données"
+    accuracy_decimals: 0
+    internal: true
+  - platform: template
+    id: field_mode                # champ 51 ("Mode" dans maestrogateway)
+    name: "Mode (champ 51)"
+    accuracy_decimals: 0
+    internal: true
+  - platform: template
+    id: field_55                  # champ 55, inconnu
+    name: "Champ 55"
+    accuracy_decimals: 0
+    internal: true
+  - platform: template
+    id: set_puffer                # champ 56
+    name: "Réglage ballon tampon (champ 56)"
+    accuracy_decimals: 0
+    internal: true
+  - platform: template
+    id: set_boiler                # champ 57
+    name: "Réglage ballon sanitaire (champ 57)"
+    accuracy_decimals: 0
+    internal: true
+  - platform: template
+    id: set_health                # champ 58, different de 255 sur un poele hydro
+    name: "Réglage sanitaire (champ 58)"
+    accuracy_decimals: 0
+    internal: true
   # --- Sonde virtuelle ---
   - platform: homeassistant
     id: ha_room_temp
@@ -586,6 +729,18 @@ text_sensor:
     name: "Firmware carte mère"
     icon: mdi:chip
     entity_category: diagnostic
+  # Poele hydro : position de la vanne 3 voies (champ 15, 1 = sanitaire, sinon chauffage)
+  - platform: template
+    id: valve_3way
+    name: "Vanne 3 voies"
+    icon: mdi:valve
+    internal: true
+  # Capteur de niveau de pellets (champ 47)
+  - platform: template
+    id: pellet_state
+    name: "Niveau de pellets"
+    icon: mdi:grain
+    internal: true
 
 binary_sensor:
   - platform: template
@@ -601,6 +756,11 @@ binary_sensor:
     id: brazier_dirty
     name: "Brasier à nettoyer"
     device_class: problem
+  - platform: template
+    id: pellet_empty              # champ 47 = 11
+    name: "Réservoir de pellets vide"
+    device_class: problem
+    internal: true
   - platform: template
     name: "Liaison carte mère"
     device_class: connectivity
@@ -695,6 +855,30 @@ switch:
       - script.execute: { id: mcz_write, param: 50, value: 1 }
     turn_off_action:
       - script.execute: { id: mcz_write, param: 50, value: 0 }
+  # --- Commandes dependant de la configuration du poele : internes par defaut ---
+  # Capteur de pellets : parametre 148, etat lu dans le champ 47 (different de 0)
+  - platform: template
+    id: sw_pellet_sensor
+    restore_mode: DISABLED      # aucune commande envoyee au demarrage
+    name: "Capteur de pellets"
+    entity_category: config
+    internal: true
+    turn_on_action:
+      - script.execute: { id: mcz_write, param: 148, value: 1 }
+    turn_off_action:
+      - script.execute: { id: mcz_write, param: 148, value: 0 }
+  # Mode ete : parametre 58. Pas de relecture identifiee dans la trame d'information,
+  # l'etat affiche est donc celui de la derniere commande. Non teste.
+  - platform: template
+    id: sw_summer
+    restore_mode: DISABLED      # aucune commande envoyee au demarrage
+    name: "Mode été"
+    optimistic: true
+    internal: true
+    turn_on_action:
+      - script.execute: { id: mcz_write, param: 58, value: 1 }
+    turn_off_action:
+      - script.execute: { id: mcz_write, param: 58, value: 0 }
   # Active l'envoi de la temperature Home Assistant au poele. N'envoie aucune commande par lui-meme.
   - platform: template
     id: sw_probe
@@ -760,6 +944,22 @@ select:
             if (x == "No Air") return 0;
             if (x == "Automatique") return 6;
             return atoi(x.c_str());
+  # 2e ventilation canalisee : parametre 39, etat lu dans le champ 4
+  - platform: template
+    id: sel_ducted2
+    name: "Ventilation canalisée 2"
+    icon: mdi:fan
+    internal: true
+    options: [ "No Air", "1", "2", "3", "4", "5", "Automatique" ]
+    optimistic: false
+    set_action:
+      - script.execute:
+          id: mcz_write
+          param: 39
+          value: !lambda |-
+            if (x == "No Air") return 0;
+            if (x == "Automatique") return 6;
+            return atoi(x.c_str());
 
 number:
   # Consigne : parametre 42, valeur = temperature x 2
@@ -794,6 +994,119 @@ number:
             return;
           }
           id(mcz_write).execute(36, (int) x + 10);
+  # --- Commandes dependant de la configuration du poele : internes par defaut ---
+  # Consigne du ballon : parametre 51, valeur = temperature x 2, relue dans le champ 27
+  - platform: template
+    id: num_boiler_setpoint
+    name: "Consigne ballon"
+    unit_of_measurement: "°C"
+    device_class: temperature
+    min_value: 5
+    max_value: 90
+    step: 0.5
+    mode: box
+    internal: true
+    set_action:
+      - script.execute:
+          id: mcz_write
+          param: 51
+          value: !lambda 'return (int) lroundf(x * 2);'
+  # Temperatures du chronothermostat : parametres 1108 a 1110, valeur = temperature x 2.
+  # Elles ne figurent pas dans la trame d'information : pas de relecture.
+  - platform: template
+    id: num_chrono_t1
+    name: "Chronothermostat T1"
+    unit_of_measurement: "°C"
+    device_class: temperature
+    min_value: 5
+    max_value: 35
+    step: 0.5
+    mode: box
+    entity_category: config
+    internal: true
+    set_action:
+      - script.execute:
+          id: mcz_write
+          param: 1108
+          value: !lambda 'return (int) lroundf(x * 2);'
+  - platform: template
+    id: num_chrono_t2
+    name: "Chronothermostat T2"
+    unit_of_measurement: "°C"
+    device_class: temperature
+    min_value: 5
+    max_value: 35
+    step: 0.5
+    mode: box
+    entity_category: config
+    internal: true
+    set_action:
+      - script.execute:
+          id: mcz_write
+          param: 1109
+          value: !lambda 'return (int) lroundf(x * 2);'
+  - platform: template
+    id: num_chrono_t3
+    name: "Chronothermostat T3"
+    unit_of_measurement: "°C"
+    device_class: temperature
+    min_value: 5
+    max_value: 35
+    step: 0.5
+    mode: box
+    entity_category: config
+    internal: true
+    set_action:
+      - script.execute:
+          id: mcz_write
+          param: 1110
+          value: !lambda 'return (int) lroundf(x * 2);'
+  # Parametres entiers dont les valeurs ne sont pas documentees : la valeur brute est
+  # envoyee telle quelle et relue dans la trame d'information. Non testes.
+  - platform: template
+    id: num_profile               # parametre 149, relu dans le champ 18
+    name: "Profil (réglage)"
+    min_value: 0
+    max_value: 255
+    step: 1
+    mode: box
+    entity_category: config
+    internal: true
+    set_action:
+      - script.execute: { id: mcz_write, param: 149, value: !lambda 'return (int) x;' }
+  - platform: template
+    id: num_temp_unit             # parametre 49, relu dans le champ 48 (Celsius / Fahrenheit)
+    name: "Unité de température (code)"
+    min_value: 0
+    max_value: 255
+    step: 1
+    mode: box
+    entity_category: config
+    internal: true
+    set_action:
+      - script.execute: { id: mcz_write, param: 49, value: !lambda 'return (int) x;' }
+  - platform: template
+    id: num_sleep                 # parametre 57, relu dans le champ 50
+    name: "Sleep (code)"
+    min_value: 0
+    max_value: 255
+    step: 1
+    mode: box
+    entity_category: config
+    internal: true
+    set_action:
+      - script.execute: { id: mcz_write, param: 57, value: !lambda 'return (int) x;' }
+  - platform: template
+    id: num_antifreeze            # parametre 154, relu dans le champ 60
+    name: "Antigel (code)"
+    min_value: 0
+    max_value: 255
+    step: 1
+    mode: box
+    entity_category: config
+    internal: true
+    set_action:
+      - script.execute: { id: mcz_write, param: 154, value: !lambda 'return (int) x;' }
 
 button:
   - platform: template
@@ -820,6 +1133,24 @@ button:
           snprintf(buf, sizeof(buf), "C|SalvaDataOra|%02d%02d%04d%02d%02d",
                    t.day_of_month, t.month, t.year, t.hour, t.minute);
           id(tx_queue).push_back(buf);
+  # Remise a zero de la fonction Active : parametre 2 = 255. Non teste.
+  - platform: template
+    id: btn_reset_active
+    name: "Réinitialiser Active"
+    entity_category: config
+    internal: true
+    on_press:
+      - script.execute: { id: mcz_write, param: 2, value: 255 }
+  # Chargement de la vis sans fin : parametre 34 = 49. Fait tourner la vis et amene des
+  # pellets dans le brasier. Non teste, a n'utiliser que poele eteint et froid.
+  - platform: template
+    id: btn_load_auger
+    name: "Charger la vis sans fin"
+    icon: mdi:screw-lag
+    entity_category: config
+    internal: true
+    on_press:
+      - script.execute: { id: mcz_write, param: 34, value: 49 }
   - platform: restart
     name: "Redémarrer le module"
     entity_category: diagnostic

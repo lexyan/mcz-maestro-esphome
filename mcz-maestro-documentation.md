@@ -444,6 +444,7 @@ Fichier : `mcz-poele.yaml`. Il remplace le firmware du module WiFi 2 (cloud). Le
 | `reboot_timeout` | Délai avant redémarrage sans WiFi ou sans Home Assistant |
 | `update_interval` | Période du capteur de signal WiFi |
 | `room_temp_entity` | Capteur Home Assistant utilisé par la sonde virtuelle |
+| `probe_id` | Numéro de la sonde WiFi simulée : `51`, `52` ou `53` pour les sondes 1 à 3 |
 
 Secrets attendus dans `secrets.yaml` : `wifi_ssid`, `wifi_password`, `esphome_encryption_key`, `ap_wifi_password`. Les mises à jour OTA sont chiffrées avec la clé de l'API.
 
@@ -508,6 +509,39 @@ Secrets attendus dans `secrets.yaml` : `wifi_ssid`, `wifi_password`, `esphome_en
 - Signal WiFi
 - Boutons Actualiser et Redémarrer le module
 
+**Entités internes (selon la configuration du poêle)**
+
+Tout ce que la carte mère expose est déclaré dans le fichier. Ce qui dépend de la configuration du poêle (hydro, ballon, 2ᵉ canalisation, capteur de pellets…) est en `internal: true` : la donnée est décodée, mais l'entité n'apparaît pas dans Home Assistant. Passer `internal` à `false` sur les entités utiles à ton poêle.
+
+| Entité | Type | Champ lu | Paramètre écrit |
+|---|---|---|---|
+| Ventilation canalisée 2 | Liste : No Air / 1 à 5 / Automatique | 4 | 39 |
+| Température ballon tampon | Capteur, ÷ 2 | 7 | |
+| Température ballon sanitaire | Capteur, ÷ 2 | 8 | |
+| Température sonde NTC3 | Capteur, ÷ 2 | 9 | |
+| Température retour | Capteur, ÷ 2 | 59 | |
+| Vanne 3 voies | Texte : Sanitaire (1) / Chauffage | 15 | |
+| Pompe (PWM) | Capteur, valeur brute | 16 | |
+| Consigne ballon | Nombre, température × 2 | 27 | 51 |
+| Minutes avant extinction | Capteur | 44 | |
+| Niveau de pellets, Réservoir de pellets vide, Capteur de pellets (code) | Texte, binaire, capteur : 0 = pas de capteur, 10 = niveau correct, 11 = vide | 47 | |
+| Capteur de pellets | Interrupteur | 47 | 148 |
+| Sonde WiFi 2 et 3 (lues par le poêle) | Capteur, ÷ 2 | 53, 54 | |
+| Chronothermostat T1, T2, T3 | Nombre, température × 2, sans relecture | | 1108, 1109, 1110 |
+| Mode été | Interrupteur, sans relecture | | 58 |
+| Profil (réglage) | Nombre, valeur brute | 18 | 149 |
+| Unité de température (code) | Nombre, valeur brute | 48 | 49 |
+| Sleep (code) | Nombre, valeur brute | 50 | 57 |
+| Antigel (code) | Nombre, valeur brute | 60 | 154 |
+| Réinitialiser Active | Bouton | | 2 = `255` |
+| Charger la vis sans fin | Bouton | | 34 = `49` |
+| Adresse Modbus, Identifiant base de données, Mode (champ 51), Champ 55, Réglages (champs 56 à 58) | Capteurs, valeur brute | 19, 31, 51, 55, 56 à 58 | |
+
+- Ces entités viennent de la table de maestrogateway et **n'ont pas été testées** : le poêle étudié n'a aucune de ces options.
+- Pour les températures optionnelles, la valeur `255` est traitée comme « sonde absente ».
+- Le bouton « Charger la vis sans fin » amène des pellets dans le brasier : à n'utiliser que poêle éteint et froid.
+- Ne sont volontairement pas déclarées : les commandes de diagnostic (`C|Diagnostica|…`, pilotage direct de l'extracteur, de la vis, de la bougie, des ventilateurs, de la pompe et de la vanne) et la réinitialisation d'usine (paramètre 46). Elles restent accessibles par l'action `send_command`.
+
 ### Thermostat
 
 L'entité « Thermostat » regroupe la marche/arrêt, la consigne et la température ambiante dans une carte thermostat de Home Assistant.
@@ -556,7 +590,7 @@ data:
 
 Elle remplace la sonde d'ambiance déportée par un capteur de Home Assistant.
 
-- Trame envoyée : `C|RecuperaTemperaturaWiFi|51|<T × 2>|<version>|00|<qualité WiFi>`. Le `51` désigne la sonde 1 ; les sondes 2 et 3 utiliseraient `52` et `53`.
+- Trame envoyée : `C|RecuperaTemperaturaWiFi|<sonde>|<T × 2>|<version>|00|<qualité WiFi>`. Le numéro de sonde vient de la substitution `probe_id` : `51` pour la sonde 1 (valeur par défaut), `52` et `53` pour les sondes 2 et 3.
 - La température est arrondie au demi-degré le plus proche (23,3 °C est envoyé comme 23,5 °C), ce qui évite le biais vers le bas d'une troncature.
 - Premier envoi 30 secondes après le démarrage, puis à l'intervalle renvoyé par le poêle, borné entre 1 et 30 minutes.
 - Aucun envoi si le capteur est indisponible ou si Home Assistant est injoignable.
