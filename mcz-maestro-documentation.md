@@ -223,6 +223,7 @@ La carte mère ne vérifie pas le numéro de version (constaté à l'usage). Ell
 | 50 | Sons | 0 / 1 |
 | 1111 | Chronothermostat | 0 / 1 |
 | 1 | Acquittement d'alarme | `255` |
+| 43 | Remise à zéro du compteur d'entretien | `0` |
 
 ### Champs de la trame d'information utilisés
 
@@ -587,6 +588,7 @@ select:
 | `refresh` | Demande la trame d'information | |
 | `reset_alarm` | Acquitte l'alarme | 1 = `255` |
 | `set_time` | Règle l'heure du poêle (option `time_id` du composant) | |
+| `reset_service` | Remet à zéro le compteur d'entretien (« heures avant entretien ») | 43 = `0` |
 
 **Entités selon la configuration du poêle**
 

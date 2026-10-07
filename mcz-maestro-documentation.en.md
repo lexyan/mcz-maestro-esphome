@@ -225,6 +225,7 @@ The mainboard does not check the version number (observed in use). It only works
 | 50 | Sounds | 0 / 1 |
 | 1111 | Chronothermostat | 0 / 1 |
 | 1 | Alarm acknowledgement | `255` |
+| 43 | Service counter reset | `0` |
 
 ### Information frame fields used
 
@@ -588,6 +589,7 @@ select:
 | `refresh` | Requests the information frame | |
 | `reset_alarm` | Acknowledges the alarm | 1 = `255` |
 | `set_time` | Sets the stove clock (`time_id` option of the component) | |
+| `reset_service` | Resets the service counter ("hours before service") | 43 = `0` |
 
 **Entities depending on the stove configuration**
 

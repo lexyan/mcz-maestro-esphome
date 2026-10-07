@@ -95,7 +95,7 @@ mcz_maestro:
 | `switch` | `power`, `eco_mode`, `silent_mode`, `active_mode`, `chronothermostat`, `sounds`, `virtual_probe`, `pellet_sensor`, `summer_mode` |
 | `select` | `control_mode`, `fan`, `ducted_fan_1`, `ducted_fan_2` |
 | `number` | `setpoint`, `power`, `boiler_setpoint`, `chrono_t1` … `chrono_t3`, `profile`, `temperature_unit`, `sleep`, `antifreeze` |
-| `button` | `refresh`, `reset_alarm`, `set_time`, `reset_active`, `load_auger` |
+| `button` | `refresh`, `reset_alarm`, `set_time`, `reset_service`, `reset_active`, `load_auger` |
 
 The labels of a `select` can be translated; the keys are the values sent to the stove:
 

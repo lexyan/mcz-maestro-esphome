@@ -256,6 +256,8 @@ button:
       name: "Acknowledge alarm"
     set_time:
       name: "Set stove clock"
+    reset_service:
+      name: "Reset service counter"
     # Untested. load_auger feeds pellets: stove off and cold only
     reset_active:
       name: "Reset Active"

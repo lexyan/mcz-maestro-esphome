@@ -223,6 +223,8 @@ button:
       name: "Acquitter l'alarme"
     set_time:
       name: "Régler l'heure du poêle"
+    reset_service:
+      name: "Réinitialiser le compteur d'entretien"
   - platform: restart
     name: "Redémarrer le module"
     entity_category: diagnostic
