@@ -15,7 +15,7 @@ It covers:
 
 > **Warning.** This information comes from firmware analysis and a community project, not from manufacturer documentation. A pellet stove is a combustion appliance: run your first remote-control tests while standing in front of the stove.
 
-The entity names quoted in this document are the French names defined in the ESPHome configuration.
+Entities are referred to by their configuration key; their names are free.
 
 ---
 

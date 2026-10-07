@@ -1,7 +1,6 @@
 # Poêle MCZ Ego 2 (une ventilation canalisée, pas de module hydro), entités en français.
 #
-# Équivalent du fichier mcz-poele.yaml, écrit avec le composant mcz_maestro :
-# seules les entités déclarées ici sont compilées et exposées dans Home Assistant.
+# Seules les entités déclarées ici sont compilées et exposées dans Home Assistant.
 # Voir examples/full.yaml pour la liste complète des entités disponibles.
 #
 # secrets.yaml attendu : wifi_ssid, wifi_password, esphome_encryption_key, ap_wifi_password
