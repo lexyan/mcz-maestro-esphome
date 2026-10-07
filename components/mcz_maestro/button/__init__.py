@@ -25,7 +25,11 @@ BUTTONS = {
         WRITE,
         1,
         255,
-        button.button_schema(MczButton, icon="mdi:alarm-light-off"),
+        button.button_schema(
+            MczButton,
+            icon="mdi:alarm-light-off",
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
     ),
     # Set the stove clock from the time source (time_id of the component)
     "set_time": (

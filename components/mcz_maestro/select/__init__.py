@@ -1,7 +1,7 @@
 import esphome.codegen as cg
 from esphome.components import select
 import esphome.config_validation as cv
-from esphome.const import CONF_OPTIONS
+from esphome.const import CONF_OPTIONS, ENTITY_CATEGORY_CONFIG
 
 from .. import CONF_MCZ_MAESTRO_ID, HUB_CHILD_SCHEMA, mcz_maestro_ns
 
@@ -33,8 +33,9 @@ def _option_map(allowed):
     return validator
 
 
-def _schema(defaults, icon):
-    return select.select_schema(MczSelect, icon=icon).extend(
+def _schema(defaults, icon, config=False):
+    kwargs = {"entity_category": ENTITY_CATEGORY_CONFIG} if config else {}
+    return select.select_schema(MczSelect, icon=icon, **kwargs).extend(
         {cv.Optional(CONF_OPTIONS, default=defaults): _option_map(defaults)}
     )
 
@@ -54,8 +55,8 @@ PELLET_RECIPE_OPTIONS = {0: "-3", 1: "-2", 2: "-1", 3: "0", 4: "+1", 5: "+2", 6:
 
 # key: (database cell written, index in the extra parameters, schema)
 RECIPE_SELECTS = {
-    "air_recipe": (459, 0, _schema(AIR_RECIPE_OPTIONS, "mdi:weather-windy")),
-    "pellet_recipe": (460, 1, _schema(PELLET_RECIPE_OPTIONS, "mdi:grain")),
+    "air_recipe": (459, 0, _schema(AIR_RECIPE_OPTIONS, "mdi:weather-windy", config=True)),
+    "pellet_recipe": (460, 1, _schema(PELLET_RECIPE_OPTIONS, "mdi:grain", config=True)),
 }
 
 CONFIG_SCHEMA = HUB_CHILD_SCHEMA.extend(

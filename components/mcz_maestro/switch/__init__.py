@@ -26,9 +26,9 @@ def _schema(icon=None, config=False):
 SWITCHES = {
     # Stove on/off: parameter 34 (1 = on, 40 = off), state from the stove state
     "power": (MczSwitchKind.SWITCH_POWER, 34, 1, _schema(icon="mdi:power")),
-    "eco_mode": (PARAM, 41, 23, _schema()),
-    "silent_mode": (PARAM, 45, 24, _schema()),
-    "active_mode": (PARAM, 35, 20, _schema()),
+    "eco_mode": (PARAM, 41, 23, _schema(config=True)),
+    "silent_mode": (PARAM, 45, 24, _schema(config=True)),
+    "active_mode": (PARAM, 35, 20, _schema(config=True)),
     "chronothermostat": (PARAM, 1111, 25, _schema()),
     "sounds": (PARAM, 50, 49, _schema(config=True)),
     # Pellet level sensor: state read from field 47 (non-zero = sensor present)
