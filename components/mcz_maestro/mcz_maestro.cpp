@@ -532,6 +532,24 @@ void MczMaestro::handle_aux_(MczAuxKind kind) {
     parse_hex_fields(this->rx_, 3, values);
   }
 
+  if (kind == AUX_EXTRA && values.has(2)) {
+    const int16_t input = (int16_t) (values.get(2) & 0xFF);
+    if (input != this->room_input_) {
+      const bool was_wifi = this->room_input_ == ROOM_INPUT_WIFI_PROBE;
+      this->room_input_ = input;
+#ifdef USE_SENSOR
+      if (input == ROOM_INPUT_WIFI_PROBE) {
+        // Back to the WiFi probe: send without waiting for the end of the interval
+        for (auto &probe : this->probes_)
+          probe.last_send = 0;
+      } else if (was_wifi || this->probes_[0].source != nullptr || this->probes_[1].source != nullptr ||
+                 this->probes_[2].source != nullptr) {
+        ESP_LOGI(TAG, "Room input is not the WiFi probe: virtual probes suspended");
+      }
+#endif
+    }
+  }
+
 #ifdef USE_SENSOR
   for (auto &entry : this->aux_sensors_) {
     if (entry.kind != kind || !values.has(entry.index))
@@ -813,6 +831,10 @@ void MczMaestro::publish_texts_(const MczInfo &info) {
 void MczMaestro::probe_tick_() {
 #ifdef USE_SENSOR
   if (!this->probe_enabled_)
+    return;
+  // With another room input, a WiFi probe frame would replace the reading of the stove's
+  // own probe (observed): nothing is sent. An unknown input does not block the probe.
+  if (this->room_input_ != -1 && this->room_input_ != ROOM_INPUT_WIFI_PROBE)
     return;
   const uint32_t now = millis();
   if (now < PROBE_FIRST_SEND_MS)

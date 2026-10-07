@@ -26,6 +26,7 @@ namespace esphome::mcz_maestro {
 static const uint8_t MCZ_MAX_FIELDS = 64;
 static const uint8_t MCZ_NO_FIELD = 0xFF;
 static const uint8_t MCZ_MAX_PROBES = 3;
+static const uint8_t ROOM_INPUT_WIFI_PROBE = 255;
 static const uint8_t MCZ_MAX_VALUES = 32;
 
 // Fields of the information frame (reply to C|RecuperoInfo)
@@ -150,6 +151,8 @@ class MczMaestro : public PollingComponent, public uart::UARTDevice {
     probe.source = source;
     probe.version = version;
     probe.require_api = require_api;
+    // The room input tells whether the stove listens to the WiFi probe
+    this->enable_aux(AUX_EXTRA);
   }
   void set_probe_sent_sensor(uint8_t number, sensor::Sensor *s) {
     if (number >= 1 && number <= MCZ_MAX_PROBES)
@@ -259,6 +262,8 @@ class MczMaestro : public PollingComponent, public uart::UARTDevice {
   // Virtual WiFi probes: all of them are suspended together by the virtual_probe switch
   bool probe_enabled_{true};
   int8_t last_probe_index_{-1};  // probe whose reply is awaited, -1 if none
+  // Room input reported by the stove: -1 unknown, 255 WiFi probe, 0 thermostat, 1 stove probe
+  int16_t room_input_{-1};
 
 #ifdef USE_SENSOR
   struct SensorEntry {

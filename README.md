@@ -125,11 +125,13 @@ From a lambda, `id(stove).send_command("C|RecuperoInfo")` sends a raw frame and
 
 `air_recipe` and `pellet_recipe` are the combustion recipes of the MCZ app (air -2 to +2,
 pellets -3 to +3). They are read with `C|RecuperoParametriExtra|11` and written to the
-stove's database with `C|WriteBancaDati` (cells 459 and 460); not tested on a stove yet.
+stove's database with `C|WriteBancaDati` (cells 459 and 460); verified on an Ego 2 (mainboard 1.8.2).
 
 The eco stop settings, the room input, the WiFi probe settings, the alarm history, the
 versions and what the stove is fitted with are read from other frames of the MCZ app
 protocol, requested only when an entity needs them. See the documentation for details.
+
+The virtual probe only sends while the stove's room input is set to the WiFi probe.
 
 Complete configurations: [`examples/full.yaml`](examples/full.yaml) (every option)
 and [`examples/mcz-ego2-fr.yaml`](examples/mcz-ego2-fr.yaml) (the stove this was built on, in French).

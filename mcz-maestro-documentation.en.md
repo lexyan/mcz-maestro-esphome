@@ -682,7 +682,7 @@ select:
 - A recipe is written to the stove's database, i.e. its parameters, probably in permanent memory: change it by hand, not from a repetitive automation.
 - Labels can be translated with `options`, as for the other selects.
 - In a lambda, `write_database(cell, bytes, value)` writes a cell of the database.
-- The format comes from the sources of the MCZ app; it **has not been tested on a stove yet**.
+- The format comes from the sources of the MCZ app; reading and writing have been verified on an Ego 2 (mainboard 1.8.2).
 
 ### Additional settings and information
 
@@ -725,11 +725,11 @@ These entities mirror menus of the MCZ app. They are read from frames other than
 
 - Until a frame has been answered, it is requested again every minute.
 - Choosing "Thermostat" as the room input also switches the stove to automatic regulation (parameter 40), as the app does.
-- The original probe sets the room input to "WiFi probe" when it is paired: keep that value with the virtual probe.
+- The virtual probe sends nothing unless the room input is "WiFi probe": otherwise its temperature would replace the reading of the stove's own probe (observed on the stove). The room input is read for this even if the `room_input` select is not declared; going back to "WiFi probe" resumes the transmissions at once.
 - Dates are those of the stove's clock.
 - The version frame also carries the name and password of the stove's access point: the component does not expose them and does not write that frame to the logs.
 - The eco stop and the room input are written to the stove's database, like the recipes: same precautions.
-- The formats come from the sources of the MCZ app; they **have not been tested on a stove yet**.
+- The formats come from the sources of the MCZ app; reads and writes have been verified on an Ego 2 (mainboard 1.8.2), with two values per select.
 
 ### Raw frames
 

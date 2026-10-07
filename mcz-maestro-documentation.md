@@ -681,7 +681,7 @@ select:
 - Une recette est écrite dans la banque de données du poêle, c'est-à-dire ses paramètres, probablement en mémoire permanente : la modifier à la main, pas depuis une automatisation répétitive.
 - Les libellés se traduisent avec `options`, comme pour les autres listes.
 - Dans une lambda, `write_database(cellule, octets, valeur)` écrit une cellule de la banque de données.
-- Le format vient des sources de l'application MCZ ; il **n'a pas encore été testé sur un poêle**.
+- Le format vient des sources de l'application MCZ ; lecture et écriture ont été vérifiées sur un Ego 2 (carte mère 1.8.2).
 
 ### Réglages et informations complémentaires
 
@@ -724,11 +724,11 @@ Ces entités reprennent des menus de l'application MCZ. Elles sont lues par d'au
 
 - Tant qu'une trame n'a pas reçu de réponse, elle est redemandée chaque minute.
 - Choisir « Thermostat » pour l'entrée ambiance passe aussi le poêle en régulation automatique (paramètre 40), comme le fait l'application.
-- La sonde d'origine règle l'entrée ambiance sur « Sonde WiFi » à son appairage : c'est la valeur à garder avec la sonde virtuelle.
+- La sonde virtuelle n'envoie rien tant que l'entrée ambiance n'est pas « Sonde WiFi » : sinon sa température remplacerait la mesure de la sonde du poêle (constaté sur le poêle). L'entrée ambiance est lue pour cela même si la liste `room_input` n'est pas déclarée ; revenir sur « Sonde WiFi » relance l'envoi aussitôt.
 - Les dates sont celles de l'horloge du poêle.
 - La trame des versions contient aussi le nom et le mot de passe du point d'accès du poêle : le composant ne les expose pas et n'écrit pas cette trame dans les logs.
 - L'eco stop et l'entrée ambiance sont écrits dans la banque de données du poêle, comme les recettes : mêmes précautions.
-- Les formats viennent des sources de l'application MCZ ; ils **n'ont pas encore été testés sur un poêle**.
+- Les formats viennent des sources de l'application MCZ ; lectures et écritures ont été vérifiées sur un Ego 2 (carte mère 1.8.2), avec deux valeurs par liste.
 
 ### Trames brutes
 
