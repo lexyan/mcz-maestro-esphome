@@ -38,6 +38,13 @@ def _no_separator(value):
     return value
 
 
+def _unique_probes(value):
+    numbers = [probe[CONF_PROBE] for probe in value]
+    if len(set(numbers)) != len(numbers):
+        raise cv.Invalid("Each virtual probe needs its own probe number (1, 2 or 3)")
+    return value
+
+
 VIRTUAL_PROBE_SCHEMA = cv.Schema(
     {
         # Sensor whose value is sent to the stove in place of the remote WiFi probe
@@ -65,7 +72,12 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_LANGUAGE, default="en"): cv.one_of("en", "fr", lower=True),
             # Time source used by the "set_time" button and by sync_time()
             cv.Optional(CONF_TIME_ID): cv.use_id(time.RealTimeClock),
-            cv.Optional(CONF_VIRTUAL_PROBE): VIRTUAL_PROBE_SCHEMA,
+            # One probe, or a list of up to three (one per probe number)
+            cv.Optional(CONF_VIRTUAL_PROBE): cv.All(
+                cv.ensure_list(VIRTUAL_PROBE_SCHEMA),
+                cv.Length(min=1, max=3),
+                _unique_probes,
+            ),
         }
     )
     .extend(cv.polling_component_schema("15s"))
@@ -97,9 +109,13 @@ async def to_code(config):
         time_ = await cg.get_variable(config[CONF_TIME_ID])
         cg.add(var.set_time(time_))
 
-    if probe := config.get(CONF_VIRTUAL_PROBE):
+    for probe in config.get(CONF_VIRTUAL_PROBE, []):
         source = await cg.get_variable(probe[CONF_TEMPERATURE_SENSOR])
-        cg.add(var.set_probe_source(source))
-        cg.add(var.set_probe_id(50 + probe[CONF_PROBE]))
-        cg.add(var.set_probe_version(probe[CONF_VERSION]))
-        cg.add(var.set_probe_require_api(probe[CONF_REQUIRE_API]))
+        cg.add(
+            var.add_probe(
+                probe[CONF_PROBE],
+                source,
+                probe[CONF_VERSION],
+                probe[CONF_REQUIRE_API],
+            )
+        )

@@ -25,6 +25,7 @@ namespace esphome::mcz_maestro {
 
 static const uint8_t MCZ_MAX_FIELDS = 64;
 static const uint8_t MCZ_NO_FIELD = 0xFF;
+static const uint8_t MCZ_MAX_PROBES = 3;
 
 // Fields of the information frame (reply to C|RecuperoInfo)
 static const uint8_t FIELD_STATE = 1;
@@ -96,13 +97,24 @@ class MczMaestro : public PollingComponent, public uart::UARTDevice {
   void set_announce(bool announce) { this->announce_ = announce; }
   void set_module_version(const char *version) { this->module_version_ = version; }
   void set_write_guard(uint32_t ms) { this->write_guard_ms_ = ms; }
-  void set_probe_id(uint8_t id) { this->probe_id_ = id; }
-  void set_probe_version(const char *version) { this->probe_version_ = version; }
-  void set_probe_require_api(bool require) { this->probe_require_api_ = require; }
 #ifdef USE_SENSOR
-  void set_probe_source(sensor::Sensor *source) { this->probe_source_ = source; }
-  void set_probe_sent_sensor(sensor::Sensor *s) { this->probe_sent_sensor_ = s; }
-  void set_probe_interval_sensor(sensor::Sensor *s) { this->probe_interval_sensor_ = s; }
+  /// Declare a virtual WiFi probe. number is 1, 2 or 3 (sent as 51, 52 or 53).
+  void add_probe(uint8_t number, sensor::Sensor *source, const char *version, bool require_api) {
+    if (number < 1 || number > MCZ_MAX_PROBES)
+      return;
+    auto &probe = this->probes_[number - 1];
+    probe.source = source;
+    probe.version = version;
+    probe.require_api = require_api;
+  }
+  void set_probe_sent_sensor(uint8_t number, sensor::Sensor *s) {
+    if (number >= 1 && number <= MCZ_MAX_PROBES)
+      this->probes_[number - 1].sent_sensor = s;
+  }
+  void set_probe_interval_sensor(uint8_t number, sensor::Sensor *s) {
+    if (number >= 1 && number <= MCZ_MAX_PROBES)
+      this->probes_[number - 1].interval_sensor = s;
+  }
   void register_sensor(sensor::Sensor *s, uint8_t field, MczSensorConv conv) {
     this->sensors_.push_back({s, field, conv});
   }
@@ -138,6 +150,7 @@ class MczMaestro : public PollingComponent, public uart::UARTDevice {
   /// Regulation mode reported by the stove: -1 unknown, 0 manual, 1 automatic.
   int8_t get_control_mode() const { return this->control_mode_; }
   bool is_linked() const;
+  /// Suspend or resume the transmissions of every virtual probe.
   void set_probe_enabled(bool enabled) { this->probe_enabled_ = enabled; }
   bool get_probe_enabled() const { return this->probe_enabled_; }
 
@@ -165,13 +178,9 @@ class MczMaestro : public PollingComponent, public uart::UARTDevice {
   const char *module_version_{"1.2.6"};
   uint32_t write_guard_ms_{20000};
 
-  // Virtual WiFi probe
-  uint8_t probe_id_{51};
-  const char *probe_version_{"1.9.9"};
+  // Virtual WiFi probes: all of them are suspended together by the virtual_probe switch
   bool probe_enabled_{true};
-  bool probe_require_api_{true};
-  uint32_t probe_interval_s_{300};
-  uint32_t probe_last_send_{0};
+  int8_t last_probe_index_{-1};  // probe whose reply is awaited, -1 if none
 
 #ifdef USE_SENSOR
   struct SensorEntry {
@@ -180,9 +189,16 @@ class MczMaestro : public PollingComponent, public uart::UARTDevice {
     MczSensorConv conv;
   };
   std::vector<SensorEntry> sensors_;
-  sensor::Sensor *probe_source_{nullptr};
-  sensor::Sensor *probe_sent_sensor_{nullptr};
-  sensor::Sensor *probe_interval_sensor_{nullptr};
+  struct ProbeEntry {
+    sensor::Sensor *source{nullptr};  // nullptr = probe not declared
+    sensor::Sensor *sent_sensor{nullptr};
+    sensor::Sensor *interval_sensor{nullptr};
+    const char *version{"1.9.9"};
+    bool require_api{true};
+    uint32_t interval_s{300};  // adjusted by the reply of the stove
+    uint32_t last_send{0};
+  };
+  ProbeEntry probes_[MCZ_MAX_PROBES];
 #endif
 #ifdef USE_BINARY_SENSOR
   struct BinaryEntry {

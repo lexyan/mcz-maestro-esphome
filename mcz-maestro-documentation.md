@@ -681,6 +681,20 @@ data:
 
 Elle remplace la sonde d'ambiance déportée par un capteur de Home Assistant. Elle se configure dans le composant, avec l'option `virtual_probe`.
 
+Les poêles à sorties canalisées peuvent avoir jusqu'à trois sondes WiFi. Dans ce cas, `virtual_probe` prend une liste, avec une entrée par numéro de sonde :
+
+```yaml
+mcz_maestro:
+  id: stove
+  virtual_probe:
+    - temperature_sensor: temp_salon
+      probe: 1
+    - temperature_sensor: temp_zone_2
+      probe: 2
+```
+
+Chaque sonde suit son propre intervalle d'envoi. Les capteurs `virtual_probe_temperature` et `virtual_probe_interval` concernent la sonde 1 ; ceux des sondes 2 et 3 s'appellent `virtual_probe_2_temperature`, `virtual_probe_2_interval`, `virtual_probe_3_temperature` et `virtual_probe_3_interval`. L'envoi de plusieurs sondes n'a pas été testé sur un poêle : l'association d'une sonde à une sortie canalisée se règle côté poêle.
+
 | Option | Défaut | Rôle |
 |---|---|---|
 | `temperature_sensor` | | Identifiant du capteur ESPHome à envoyer, par exemple un capteur `homeassistant` |
@@ -692,7 +706,7 @@ Elle remplace la sonde d'ambiance déportée par un capteur de Home Assistant. E
 - La température est arrondie au demi-degré le plus proche (23,3 °C est envoyé comme 23,5 °C), ce qui évite le biais vers le bas d'une troncature.
 - Premier envoi 30 secondes après le démarrage, puis à l'intervalle renvoyé par le poêle, borné entre 1 et 30 minutes.
 - Aucun envoi si le capteur est indisponible ou si Home Assistant est injoignable.
-- L'interrupteur `virtual_probe`, s'il est déclaré, permet de suspendre les envois ; il est actif à chaque démarrage.
+- L'interrupteur `virtual_probe`, s'il est déclaré, permet de suspendre les envois de toutes les sondes ; il est actif à chaque démarrage.
 - Éteindre la sonde d'origine, sinon les deux envoient chacune leur température.
 - Si la sonde virtuelle cesse d'envoyer des températures valides, le poêle repasse automatiquement en mode manuel et l'application affiche « sonde wifi déconnectée ».
 

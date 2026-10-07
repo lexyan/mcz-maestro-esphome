@@ -682,6 +682,20 @@ data:
 
 It replaces the remote room probe with a Home Assistant sensor. It is configured in the component, with the `virtual_probe` option.
 
+Stoves with ducted outputs can have up to three WiFi probes. In that case, `virtual_probe` takes a list, with one entry per probe number:
+
+```yaml
+mcz_maestro:
+  id: stove
+  virtual_probe:
+    - temperature_sensor: room_temperature
+      probe: 1
+    - temperature_sensor: zone_2_temperature
+      probe: 2
+```
+
+Each probe follows its own transmission interval. The `virtual_probe_temperature` and `virtual_probe_interval` sensors are those of probe 1; those of probes 2 and 3 are named `virtual_probe_2_temperature`, `virtual_probe_2_interval`, `virtual_probe_3_temperature` and `virtual_probe_3_interval`. Sending several probes has not been tested on a stove: which probe drives which ducted output is set on the stove side.
+
 | Option | Default | Role |
 |---|---|---|
 | `temperature_sensor` | | Id of the ESPHome sensor to send, for example a `homeassistant` sensor |
@@ -693,7 +707,7 @@ It replaces the remote room probe with a Home Assistant sensor. It is configured
 - The temperature is rounded to the nearest half degree (23.3 °C is sent as 23.5 °C), which avoids the downward bias of truncation.
 - First transmission 30 seconds after startup, then at the interval returned by the stove, bounded between 1 and 30 minutes.
 - Nothing is sent if the sensor is unavailable or if Home Assistant cannot be reached.
-- The `virtual_probe` switch, if declared, suspends the transmissions; it is on at every startup.
+- The `virtual_probe` switch, if declared, suspends the transmissions of every probe; it is on at every startup.
 - Turn off the original probe, otherwise both send their own temperature.
 - If the virtual probe stops sending valid temperatures, the stove automatically goes back to manual mode and the app reports the WiFi probe as disconnected.
 

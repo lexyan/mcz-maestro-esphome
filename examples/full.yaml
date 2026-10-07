@@ -63,6 +63,14 @@ mcz_maestro:
     probe: 1                # 1, 2 or 3
     # version: "1.9.9"
     # require_api: true     # send only while Home Assistant is connected
+  # Several probes (stoves with ducted outputs): use a list, one entry per probe number
+  # virtual_probe:
+  #   - temperature_sensor: room_temperature
+  #     probe: 1
+  #   - temperature_sensor: zone_2_temperature
+  #     probe: 2
+  #   - temperature_sensor: zone_3_temperature
+  #     probe: 3
 
 climate:
   - platform: mcz_maestro
@@ -124,6 +132,15 @@ sensor:
       name: "Virtual probe temperature sent"
     virtual_probe_interval:
       name: "Virtual probe interval"
+    # Same sensors for probes 2 and 3, when they are declared
+    # virtual_probe_2_temperature:
+    #   name: "Virtual probe 2 temperature sent"
+    # virtual_probe_2_interval:
+    #   name: "Virtual probe 2 interval"
+    # virtual_probe_3_temperature:
+    #   name: "Virtual probe 3 temperature sent"
+    # virtual_probe_3_interval:
+    #   name: "Virtual probe 3 interval"
     wifi_probe_1:
       name: "WiFi probe 1"
     wifi_probe_2:

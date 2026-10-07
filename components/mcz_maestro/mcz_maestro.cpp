@@ -25,6 +25,9 @@ static const uint32_t REPLY_TIMEOUT_MS = 2000;
 static const uint32_t LINK_TIMEOUT_MS = 60000;
 static const uint32_t PROBE_FIRST_SEND_MS = 30000;
 static const char *const INFO_COMMAND = "C|RecuperoInfo";
+static const char *const PROBE_COMMAND = "C|RecuperaTemperaturaWiFi|";
+static const size_t PROBE_COMMAND_LEN = 26;
+static const uint8_t PROBE_ID_BASE = 51;  // probes 1, 2 and 3 are sent as 51, 52 and 53
 
 // Texts are chosen at build time with the "language" option of the component.
 #ifdef MCZ_MAESTRO_LANG_FR
@@ -161,8 +164,10 @@ void MczMaestro::dump_config() {
                 "  Listeners: %u",
                 YESNO(this->announce_), (unsigned) this->write_guard_ms_, (unsigned) this->listeners_.size());
 #ifdef USE_SENSOR
-  if (this->probe_source_ != nullptr) {
-    ESP_LOGCONFIG(TAG, "  Virtual WiFi probe: number %u, version %s", this->probe_id_, this->probe_version_);
+  for (uint8_t i = 0; i < MCZ_MAX_PROBES; i++) {
+    if (this->probes_[i].source != nullptr)
+      ESP_LOGCONFIG(TAG, "  Virtual WiFi probe %u: sent as %u, version %s", i + 1, PROBE_ID_BASE + i,
+                    this->probes_[i].version);
   }
 #endif
   LOG_UPDATE_INTERVAL(this);
@@ -288,7 +293,14 @@ void MczMaestro::send_next_() {
   std::string cmd = std::move(this->tx_queue_.front());
   this->tx_queue_.erase(this->tx_queue_.begin());
   ESP_LOGD(TAG, "TX: %s", cmd.c_str());
-  this->last_was_probe_ = cmd.rfind("C|RecuperaTemperaturaWiFi", 0) == 0;
+  this->last_was_probe_ = cmd.rfind(PROBE_COMMAND, 0) == 0;
+  this->last_probe_index_ = -1;
+  if (this->last_was_probe_) {
+    // The reply carries no probe number: remember which probe it belongs to
+    int id = atoi(cmd.c_str() + PROBE_COMMAND_LEN);
+    if (id >= PROBE_ID_BASE && id < PROBE_ID_BASE + MCZ_MAX_PROBES)
+      this->last_probe_index_ = (int8_t) (id - PROBE_ID_BASE);
+  }
   this->last_was_announce_ = cmd.rfind("RispostaAccensione", 0) == 0;
   this->last_was_write_ = cmd.rfind("C|WriteParametri", 0) == 0;
   this->write_str(cmd.c_str());
@@ -314,15 +326,19 @@ void MczMaestro::handle_frame_() {
       char hex[3] = {this->rx_[0], this->rx_[1], 0};
       int minutes = (int) strtol(hex, nullptr, 16);
 #ifdef USE_SENSOR
-      if (this->probe_interval_sensor_ != nullptr)
-        this->probe_interval_sensor_->publish_state(minutes);
+      if (this->last_probe_index_ >= 0) {
+        auto &probe = this->probes_[this->last_probe_index_];
+        if (probe.interval_sensor != nullptr)
+          probe.interval_sensor->publish_state(minutes);
+        if (minutes < 1)
+          minutes = 1;
+        if (minutes > 30)
+          minutes = 30;
+        probe.interval_s = minutes * 60;
+      }
 #endif
-      if (minutes < 1)
-        minutes = 1;
-      if (minutes > 30)
-        minutes = 30;
-      this->probe_interval_s_ = minutes * 60;
     }
+    this->last_probe_index_ = -1;
     return;
   }
 
@@ -484,40 +500,46 @@ void MczMaestro::publish_texts_(const MczInfo &info) {
 
 void MczMaestro::probe_tick_() {
 #ifdef USE_SENSOR
-  if (this->probe_source_ == nullptr || !this->probe_enabled_)
+  if (!this->probe_enabled_)
     return;
   const uint32_t now = millis();
   if (now < PROBE_FIRST_SEND_MS)
     return;
-  if (this->probe_last_send_ != 0 && now - this->probe_last_send_ < this->probe_interval_s_ * 1000UL)
-    return;
+
+  for (uint8_t i = 0; i < MCZ_MAX_PROBES; i++) {
+    auto &probe = this->probes_[i];
+    if (probe.source == nullptr)
+      continue;
+    if (probe.last_send != 0 && now - probe.last_send < probe.interval_s * 1000UL)
+      continue;
 #ifdef USE_API
-  // Without Home Assistant the source value is stale: nothing is sent
-  if (this->probe_require_api_ && (api::global_api_server == nullptr || !api::global_api_server->is_connected()))
-    return;
+    // Without Home Assistant the source value is stale: nothing is sent
+    if (probe.require_api && (api::global_api_server == nullptr || !api::global_api_server->is_connected()))
+      continue;
 #endif
-  float temperature = this->probe_source_->state;
-  if (std::isnan(temperature))
-    return;  // source unavailable: nothing is sent
-  if (temperature < 0 || temperature > 100)
-    temperature = 0;  // same rule as the original probe
+    float temperature = probe.source->state;
+    if (std::isnan(temperature))
+      continue;  // source unavailable: nothing is sent
+    if (temperature < 0 || temperature > 100)
+      temperature = 0;  // same rule as the original probe
 
-  int quality = 100;
+    int quality = 100;
 #ifdef USE_WIFI
-  if (wifi::global_wifi_component != nullptr) {
-    int rssi = wifi::global_wifi_component->wifi_rssi();
-    quality = rssi <= -100 ? 0 : (rssi >= -50 ? 100 : 2 * (rssi + 100));
-  }
+    if (wifi::global_wifi_component != nullptr) {
+      int rssi = wifi::global_wifi_component->wifi_rssi();
+      quality = rssi <= -100 ? 0 : (rssi >= -50 ? 100 : 2 * (rssi + 100));
+    }
 #endif
 
-  int half = (int) lroundf(temperature * 2);  // the stove works in half degrees
-  char buf[64];
-  snprintf(buf, sizeof(buf), "C|RecuperaTemperaturaWiFi|%u|%d|%s|00|%d", this->probe_id_, half, this->probe_version_,
-           quality);
-  this->send_command(buf);
-  this->probe_last_send_ = now;
-  if (this->probe_sent_sensor_ != nullptr)
-    this->probe_sent_sensor_->publish_state(half / 2.0f);
+    int half = (int) lroundf(temperature * 2);  // the stove works in half degrees
+    char buf[64];
+    snprintf(buf, sizeof(buf), "%s%u|%d|%s|00|%d", PROBE_COMMAND, PROBE_ID_BASE + i, half, probe.version, quality);
+    if (!this->send_command(buf))
+      continue;  // queue full: retried at the next tick
+    probe.last_send = now;
+    if (probe.sent_sensor != nullptr)
+      probe.sent_sensor->publish_state(half / 2.0f);
+  }
 #endif
 }
 

@@ -144,18 +144,30 @@ SENSORS = {
     "set_health": (58, RAW, _raw()),
 }
 
-# Sensors fed by the virtual WiFi probe rather than by the information frame
-CONF_VIRTUAL_PROBE_TEMPERATURE = "virtual_probe_temperature"
-CONF_VIRTUAL_PROBE_INTERVAL = "virtual_probe_interval"
+# Sensors fed by the virtual WiFi probes rather than by the information frame.
+# key: probe number. The keys without a number are those of probe 1.
+VIRTUAL_PROBE_TEMPERATURES = {
+    "virtual_probe_temperature": 1,
+    "virtual_probe_2_temperature": 2,
+    "virtual_probe_3_temperature": 3,
+}
+VIRTUAL_PROBE_INTERVALS = {
+    "virtual_probe_interval": 1,
+    "virtual_probe_2_interval": 2,
+    "virtual_probe_3_interval": 3,
+}
 
 CONFIG_SCHEMA = HUB_CHILD_SCHEMA.extend(
     {cv.Optional(key): schema for key, (_, _, schema) in SENSORS.items()}
 ).extend(
     {
         # Temperature last sent to the stove
-        cv.Optional(CONF_VIRTUAL_PROBE_TEMPERATURE): _temperature(diagnostic=True),
+        **{
+            cv.Optional(key): _temperature(diagnostic=True)
+            for key in VIRTUAL_PROBE_TEMPERATURES
+        },
         # Minutes requested by the stove before the next transmission
-        cv.Optional(CONF_VIRTUAL_PROBE_INTERVAL): _raw(unit=UNIT_MINUTE),
+        **{cv.Optional(key): _raw(unit=UNIT_MINUTE) for key in VIRTUAL_PROBE_INTERVALS},
     }
 )
 
@@ -166,9 +178,11 @@ async def to_code(config):
         if conf := config.get(key):
             sens = await sensor.new_sensor(conf)
             cg.add(parent.register_sensor(sens, field, conv))
-    if conf := config.get(CONF_VIRTUAL_PROBE_TEMPERATURE):
-        sens = await sensor.new_sensor(conf)
-        cg.add(parent.set_probe_sent_sensor(sens))
-    if conf := config.get(CONF_VIRTUAL_PROBE_INTERVAL):
-        sens = await sensor.new_sensor(conf)
-        cg.add(parent.set_probe_interval_sensor(sens))
+    for key, number in VIRTUAL_PROBE_TEMPERATURES.items():
+        if conf := config.get(key):
+            sens = await sensor.new_sensor(conf)
+            cg.add(parent.set_probe_sent_sensor(number, sens))
+    for key, number in VIRTUAL_PROBE_INTERVALS.items():
+        if conf := config.get(key):
+            sens = await sensor.new_sensor(conf)
+            cg.add(parent.set_probe_interval_sensor(number, sens))

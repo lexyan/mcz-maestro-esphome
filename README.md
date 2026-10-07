@@ -83,12 +83,25 @@ mcz_maestro:
     probe: 1                               # 1, 2 or 3
 ```
 
+Stoves with ducted outputs can have up to three WiFi probes. Declare them as a list,
+one entry per probe number; each probe follows the interval the stove asks for it:
+
+```yaml
+mcz_maestro:
+  id: stove
+  virtual_probe:
+    - temperature_sensor: room_temperature
+      probe: 1
+    - temperature_sensor: zone_2_temperature
+      probe: 2
+```
+
 ### Entities
 
 | Platform | Keys |
 |---|---|
 | `climate` | one thermostat; `manual_preset` and `auto_preset` set the preset labels |
-| `sensor` | `ambient_temperature`, `fume_temperature`, `power_level`, `state_code`, `board_temperature`, `fume_fan_rpm`, `auger_rpm`, `auger_rpm_set`, `active_set`, `active_live`, `active_temperature`, `profile`, `total_hours`, `hours_power_1` … `hours_power_5`, `hours_to_service`, `ignitions`, `minutes_to_switch_off`, `wifi_probe_1` … `wifi_probe_3`, `virtual_probe_temperature`, `virtual_probe_interval` |
+| `sensor` | `ambient_temperature`, `fume_temperature`, `power_level`, `state_code`, `board_temperature`, `fume_fan_rpm`, `auger_rpm`, `auger_rpm_set`, `active_set`, `active_live`, `active_temperature`, `profile`, `total_hours`, `hours_power_1` … `hours_power_5`, `hours_to_service`, `ignitions`, `minutes_to_switch_off`, `wifi_probe_1` … `wifi_probe_3`, `virtual_probe_temperature`, `virtual_probe_interval` (and `virtual_probe_2_…`, `virtual_probe_3_…` for probes 2 and 3) |
 | `sensor` (hydro, pellet sensor, raw) | `puffer_temperature`, `boiler_temperature`, `ntc3_temperature`, `return_temperature`, `pump_pwm`, `pellet_sensor_code`, `modbus_address`, `database_id`, `field_51`, `field_55`, `set_puffer`, `set_boiler`, `set_health` |
 | `binary_sensor` | `alarm`, `brazier_dirty`, `igniter`, `link`, `pellet_empty` |
 | `text_sensor` | `state`, `datetime`, `firmware`, `valve_3way`, `pellet_level` |
