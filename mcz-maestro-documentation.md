@@ -437,7 +437,7 @@ Deux configurations complètes sont fournies :
 ### Principe
 
 - Le module se connecte au WiFi de la maison et à Home Assistant par l'API native d'ESPHome.
-- Il interroge la carte mère avec `C|RecuperoInfo` toutes les 15 secondes, et une fois après chaque écriture ou série d'écritures.
+- Il interroge la carte mère avec `C|RecuperoInfo` toutes les 15 secondes. La carte mère répond à une écriture par la trame d'information à jour ; si ce n'est pas le cas, le module la redemande une fois après l'écriture ou la série d'écritures.
 - Une seule commande est en cours à la fois sur la liaison série, avec 2 secondes d'attente maximum.
 - Au démarrage, il envoie l'annonce `RispostaAccensioneRemoto|<MAC>|<version>`, comme le firmware d'origine.
 - On ne déclare que les entités voulues : celles qui ne sont pas listées ne sont ni compilées ni exposées dans Home Assistant.

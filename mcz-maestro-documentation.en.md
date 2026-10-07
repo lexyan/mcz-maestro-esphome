@@ -439,7 +439,7 @@ Two complete configurations are provided:
 ### Principle
 
 - The module connects to the home WiFi and to Home Assistant through the native ESPHome API.
-- It polls the mainboard with `C|RecuperoInfo` every 15 seconds, and once after each write or series of writes.
+- It polls the mainboard with `C|RecuperoInfo` every 15 seconds. The mainboard answers a write with the updated information frame; when it does not, the module requests it once after the write or series of writes.
 - Only one command is in progress at a time on the serial link, with a 2-second timeout.
 - At startup, it sends the announcement `RispostaAccensioneRemoto|<MAC>|<version>`, like the original firmware.
 - Only the wanted entities are declared: those that are not listed are neither compiled nor exposed in Home Assistant.
