@@ -29,7 +29,7 @@ SWITCHES = {
     "eco_mode": (PARAM, 41, 23, _schema(config=True)),
     "silent_mode": (PARAM, 45, 24, _schema(config=True)),
     "active_mode": (PARAM, 35, 20, _schema(config=True)),
-    "chronothermostat": (PARAM, 1111, 25, _schema()),
+    "chronothermostat": (PARAM, 1111, 25, _schema(config=True)),
     "sounds": (PARAM, 50, 49, _schema(config=True)),
     # Pellet level sensor: state read from field 47 (non-zero = sensor present)
     "pellet_sensor": (PARAM, 148, 47, _schema(config=True)),
