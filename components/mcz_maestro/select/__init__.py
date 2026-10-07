@@ -13,6 +13,8 @@ MczSelect = mcz_maestro_ns.class_("MczSelect", select.Select)
 FAN_OPTIONS = {0: "Off", 1: "1", 2: "2", 3: "3", 4: "4", 5: "5", 6: "Auto"}
 # Regulation mode: 0 = manual (fixed power), 1 = automatic (follows the setpoint)
 CONTROL_MODE_OPTIONS = {0: "Manual", 1: "Auto"}
+# Season ("Estate / Inverno" in the MCZ app): 0 = winter, 1 = summer
+SEASON_OPTIONS = {0: "Winter", 1: "Summer"}
 
 
 def _option_map(allowed):
@@ -46,6 +48,11 @@ SELECTS = {
     "fan": (37, 2, _schema(FAN_OPTIONS, "mdi:fan")),
     "ducted_fan_1": (38, 3, _schema(FAN_OPTIONS, "mdi:fan")),
     "ducted_fan_2": (39, 4, _schema(FAN_OPTIONS, "mdi:fan")),
+    "season_mode": (
+        58,
+        51,
+        _schema(SEASON_OPTIONS, "mdi:sun-snowflake-variant", config=True),
+    ),
 }
 
 # Combustion recipes ("Ricetta Aria" / "Ricetta Pellet" in the MCZ app). They are read

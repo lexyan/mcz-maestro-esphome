@@ -222,8 +222,6 @@ switch:
     # Untested
     pellet_sensor:
       name: "Pellet sensor"
-    summer_mode:
-      name: "Summer mode"
 
 select:
   - platform: mcz_maestro
@@ -238,6 +236,9 @@ select:
       name: "Ducted fan 1"
     ducted_fan_2:
       name: "Ducted fan 2"
+    season_mode:
+      name: "Season"
+      # options: { 0: "Winter", 1: "Summer" }
     # Combustion recipes ("Ricetta Aria" / "Ricetta Pellet" in the MCZ app)
     air_recipe:
       name: "Air recipe"

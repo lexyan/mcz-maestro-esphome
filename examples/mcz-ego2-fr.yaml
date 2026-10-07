@@ -185,8 +185,6 @@ switch:
       name: "Mode Active"
     chronothermostat:
       name: "Chronothermostat"
-    summer_mode:
-      name: "Mode été"
     sounds:
       name: "Sons"
     virtual_probe:
@@ -210,6 +208,9 @@ select:
     ducted_fan_1:
       name: "Ventilation canalisée"
       options: { 0: "No Air", 1: "1", 2: "2", 3: "3", 4: "4", 5: "5", 6: "Automatique" }
+    season_mode:
+      name: "Saison"
+      options: { 0: "Hiver", 1: "Été" }
     # Recettes de combustion (« Ricetta Aria » / « Ricetta Pellet » dans l'application MCZ)
     air_recipe:
       name: "Recette air"

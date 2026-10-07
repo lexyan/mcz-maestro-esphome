@@ -33,13 +33,7 @@ SWITCHES = {
     "sounds": (PARAM, 50, 49, _schema(config=True)),
     # Pellet level sensor: state read from field 47 (non-zero = sensor present)
     "pellet_sensor": (PARAM, 148, 47, _schema(config=True)),
-    # Summer / winter mode: field 51 is 1 in summer mode, 0 in winter mode
-    "summer_mode": (
-        PARAM,
-        58,
-        51,
-        _schema(icon="mdi:sun-snowflake-variant", config=True),
-    ),
+    # Summer / winter mode: see the season_mode select
     # Enables the virtual WiFi probe. On at every boot, sends nothing by itself.
     "virtual_probe": (
         MczSwitchKind.SWITCH_VIRTUAL_PROBE,

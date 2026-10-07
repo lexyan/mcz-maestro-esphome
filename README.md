@@ -105,8 +105,8 @@ mcz_maestro:
 | `sensor` (hydro, pellet sensor, raw) | `puffer_temperature`, `boiler_temperature`, `ntc3_temperature`, `return_temperature`, `pump_pwm`, `pellet_sensor_code`, `modbus_address`, `database_id`, `field_51`, `field_55`, `set_puffer`, `set_boiler`, `set_health` |
 | `binary_sensor` | `alarm`, `brazier_dirty`, `igniter`, `link`, `pellet_empty` |
 | `text_sensor` | `state`, `datetime`, `firmware`, `valve_3way`, `pellet_level` |
-| `switch` | `power`, `eco_mode`, `silent_mode`, `active_mode`, `chronothermostat`, `sounds`, `virtual_probe`, `pellet_sensor`, `summer_mode` |
-| `select` | `control_mode`, `fan`, `ducted_fan_1`, `ducted_fan_2`, `air_recipe`, `pellet_recipe` |
+| `switch` | `power`, `eco_mode`, `silent_mode`, `active_mode`, `chronothermostat`, `sounds`, `virtual_probe`, `pellet_sensor` |
+| `select` | `control_mode`, `fan`, `ducted_fan_1`, `ducted_fan_2`, `season_mode`, `air_recipe`, `pellet_recipe` |
 | `number` | `setpoint`, `power`, `boiler_setpoint`, `chrono_t1` … `chrono_t3`, `profile`, `temperature_unit`, `sleep`, `antifreeze` |
 | `button` | `refresh`, `reset_alarm`, `set_time`, `reset_service`, `reset_active`, `load_auger` |
 
