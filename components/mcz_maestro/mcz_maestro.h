@@ -125,7 +125,8 @@ class MczMaestro : public PollingComponent, public uart::UARTDevice {
   // --- Actions, usable from lambdas ---
   /// Queue a raw command, without the final '^'. Returns false if the queue is full.
   bool send_command(const std::string &command);
-  /// Queue C|WriteParametri|<param>|<value>; a refresh follows. Returns false if the
+  /// Queue C|WriteParametri|<param>|<value>. A refresh follows unless the mainboard
+  /// answers the write with the information frame itself. Returns false if the
   /// write was not queued (start-up guard or queue full).
   bool write_parameter(uint16_t param, int value);
   /// Queue a request for the information frame.
@@ -152,6 +153,7 @@ class MczMaestro : public PollingComponent, public uart::UARTDevice {
   bool busy_{false};
   bool last_was_probe_{false};
   bool last_was_announce_{false};
+  bool last_was_write_{false};
   bool refresh_pending_{false};
   uint32_t busy_since_{0};
   uint32_t last_reply_{0};

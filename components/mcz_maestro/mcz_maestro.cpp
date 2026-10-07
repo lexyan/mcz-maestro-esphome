@@ -255,6 +255,7 @@ void MczMaestro::loop() {
     }
     this->busy_ = false;
     this->last_was_probe_ = false;
+    this->last_was_write_ = false;
     this->rx_.clear();
   }
 
@@ -289,6 +290,7 @@ void MczMaestro::send_next_() {
   ESP_LOGD(TAG, "TX: %s", cmd.c_str());
   this->last_was_probe_ = cmd.rfind("C|RecuperaTemperaturaWiFi", 0) == 0;
   this->last_was_announce_ = cmd.rfind("RispostaAccensione", 0) == 0;
+  this->last_was_write_ = cmd.rfind("C|WriteParametri", 0) == 0;
   this->write_str(cmd.c_str());
   this->write_str("^\r\n");
   this->busy_ = true;
@@ -325,8 +327,15 @@ void MczMaestro::handle_frame_() {
   }
 
   // Only the information frame (type 01) is decoded
-  if (this->rx_.size() >= 3 && this->rx_[0] == '0' && this->rx_[1] == '1' && this->rx_[2] == '|')
+  const bool after_write = this->last_was_write_;
+  this->last_was_write_ = false;
+  if (this->rx_.size() >= 3 && this->rx_[0] == '0' && this->rx_[1] == '1' && this->rx_[2] == '|') {
+    // The mainboard answers a write with the updated information frame: when it is the
+    // last write of a burst, the refresh that would follow is not needed.
+    if (after_write && this->tx_queue_.empty())
+      this->refresh_pending_ = false;
     this->handle_info_();
+  }
 }
 
 void MczMaestro::handle_info_() {
