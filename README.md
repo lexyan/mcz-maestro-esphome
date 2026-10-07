@@ -134,7 +134,6 @@ are deliberately not exposed.
 |---|---|
 | `components/mcz_maestro/` | The ESPHome external component |
 | `examples/` | Example configurations using the component |
-| `mcz-poele.yaml` | Earlier single-file configuration, without the component |
 | `mcz-maestro-documentation.en.md` | Full documentation (English) |
 | `mcz-maestro-documentation.md` | Full documentation (French) |
 | `esp8266_split.py` | Splits an ESP8266 flash dump into its regions |

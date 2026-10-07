@@ -400,7 +400,7 @@ L'effacement supprime les restes de l'ancien firmware, dont le mot de passe WiFi
 
 ### Écrire le firmware ESPHome
 
-Sur ESP8266, ESPHome produit un seul fichier, à écrire à l'adresse `0x0`. Il ne contient que le programme (environ 450 ko), pas une image complète de la flash.
+Sur ESP8266, ESPHome produit un seul fichier, à écrire à l'adresse `0x0`. Il ne contient que le programme (environ 470 ko), pas une image complète de la flash.
 
 ```
 esptool --port COM3 --baud 115200 write-flash --flash-mode dout --flash-size 2MB 0x0 firmware.bin
@@ -426,33 +426,56 @@ esptool --port COM3 write-flash --flash-mode dout --flash-size 2MB 0x0 backup-wi
 
 ## 6. Configuration ESPHome
 
-Fichier : `mcz-poele.yaml`. Il remplace le firmware du module WiFi 2 (cloud). Le module WiFi 1 (local) n'est pas modifié : l'application en mode direct et le point d'accès du poêle continuent de fonctionner.
+Le firmware du module WiFi 2 (cloud) est remplacé par ESPHome, avec le composant externe `mcz_maestro` du dépôt (dossier `components/mcz_maestro`). Le module WiFi 1 (local) n'est pas modifié : l'application en mode direct et le point d'accès du poêle continuent de fonctionner.
 
-### Composant externe `mcz_maestro`
+Deux configurations complètes sont fournies :
 
-La même configuration existe sous forme de composant ESPHome, dans le dossier `components/mcz_maestro` du dépôt. Avec lui, on ne déclare que les entités voulues : celles qui ne sont pas listées ne sont ni compilées ni exposées, ce qui remplace le réglage `internal` décrit plus bas. Les options et la liste des entités sont dans le `README.md` ; `examples/full.yaml` montre toutes les entités et `examples/mcz-ego2-fr.yaml` reprend la configuration de ce document.
-
-Le protocole, les sécurités et la sonde virtuelle décrits ci-dessous s'appliquent aux deux formes.
+- `examples/mcz-ego2-fr.yaml` : celle du poêle étudié, avec les noms d'entités en français utilisés dans ce document ;
+- `examples/full.yaml` : toutes les entités disponibles.
 
 ### Principe
 
 - Le module se connecte au WiFi de la maison et à Home Assistant par l'API native d'ESPHome.
-- Il interroge la carte mère avec `C|RecuperoInfo` toutes les 15 secondes et après chaque écriture.
+- Il interroge la carte mère avec `C|RecuperoInfo` toutes les 15 secondes, et une fois après chaque écriture ou série d'écritures.
 - Une seule commande est en cours à la fois sur la liaison série, avec 2 secondes d'attente maximum.
 - Au démarrage, il envoie l'annonce `RispostaAccensioneRemoto|<MAC>|<version>`, comme le firmware d'origine.
+- On ne déclare que les entités voulues : celles qui ne sont pas listées ne sont ni compilées ni exposées dans Home Assistant.
 
-### Réglages en tête de fichier
+### Déclaration du composant
 
-| Substitution | Rôle |
-|---|---|
-| `name`, `friendly_name` | Nom de l'appareil |
-| `poll_interval` | Période d'interrogation de la carte mère |
-| `reboot_timeout` | Délai avant redémarrage sans WiFi ou sans Home Assistant |
-| `update_interval` | Période du capteur de signal WiFi |
-| `room_temp_entity` | Capteur Home Assistant utilisé par la sonde virtuelle |
-| `probe_id` | Numéro de la sonde WiFi simulée : `51`, `52` ou `53` pour les sondes 1 à 3 |
+```yaml
+external_components:
+  - source: github://lexyan/mcz-maestro-esphome
+    components: [ mcz_maestro ]
 
-Secrets attendus dans `secrets.yaml` : `wifi_ssid`, `wifi_password`, `esphome_encryption_key`, `ap_wifi_password`. Les mises à jour OTA sont chiffrées avec la clé de l'API.
+logger:
+  baud_rate: 0          # la liaison série est réservée au poêle
+
+uart:
+  tx_pin: GPIO1
+  rx_pin: GPIO3
+  baud_rate: 115200
+
+mcz_maestro:
+  id: stove
+  language: fr
+  time_id: ha_time
+  virtual_probe:
+    temperature_sensor: ha_room_temp
+    probe: 1
+```
+
+| Option | Défaut | Rôle |
+|---|---|---|
+| `update_interval` | `15s` | Période d'interrogation de la carte mère |
+| `language` | `en` | Langue des textes publiés (état, vanne, pellets) : `en` ou `fr` |
+| `announce` | `true` | Annonce du module à la carte mère au démarrage |
+| `module_version` | `1.2.6` | Version envoyée dans cette annonce |
+| `write_guard` | `20s` | Délai après le démarrage pendant lequel aucune écriture n'est envoyée |
+| `time_id` | | Source de l'heure utilisée par le bouton `set_time` |
+| `virtual_probe` | | Sonde virtuelle (voir plus bas) |
+
+Secrets attendus par les exemples, dans `secrets.yaml` : `wifi_ssid`, `wifi_password`, `esphome_encryption_key`, `ap_wifi_password`. Les mises à jour OTA sont chiffrées avec la clé de l'API.
 
 ### Matériel
 
@@ -466,91 +489,141 @@ Secrets attendus dans `secrets.yaml` : `wifi_ssid`, `wifi_password`, `esphome_en
 
 ### Entités
 
-**Capteurs**
+Chaque entité se déclare par sa clé, sous la plateforme correspondante :
 
-| Entité | Type |
-|---|---|
-| Température ambiante | Capteur |
-| Température fumées | Capteur |
-| Puissance | Capteur, lecture seule |
-| État | Texte |
-| Alarme | Binaire |
-| Brasier à nettoyer | Binaire |
+```yaml
+sensor:
+  - platform: mcz_maestro
+    ambient_temperature:
+      name: "Température ambiante"
+```
 
-**Commandes**
+Le nom est libre. Les colonnes « Champ » et « Paramètre » renvoient à la partie 3.
 
-| Entité | Type | Paramètre |
+**Thermostat (`climate`)**
+
+Une seule entité, sans clé : arrêt / chauffage, consigne, température ambiante et deux préréglages pour le mode de régulation. Les options `manual_preset` et `auto_preset` fixent leurs libellés (« Manuel » et « Automatique » dans l'exemple). Paramètres 34, 42 et 40.
+
+**Capteurs (`sensor`)**
+
+| Clé | Contenu | Champ |
 |---|---|---|
-| Thermostat | Climat (arrêt / chauffage, consigne, température ambiante, préréglages Manuel / Automatique) | 34, 42 et 40 |
-| Marche | Interrupteur | 34 |
-| Consigne | Nombre, 5 à 35 °C par pas de 0,5 | 42 |
-| Mode de régulation | Liste : Manuel / Automatique | 40 |
-| Puissance (réglage) | Nombre, 1 à 5 (envoyé comme 11 à 15), ignoré en mode automatique | 36 |
-| Ventilation | Liste : No Air / 1 à 5 / Automatique | 37 |
-| Ventilation canalisée | Liste : No Air / 1 à 5 / Automatique | 38 |
-| Mode éco | Interrupteur | 41 |
-| Mode silencieux | Interrupteur | 45 |
-| Mode Active | Interrupteur | 35 |
-| Chronothermostat | Interrupteur | 1111 |
-| Acquitter l'alarme | Bouton | 1 |
+| `ambient_temperature` | Température ambiante | 6 |
+| `fume_temperature` | Température des fumées | 5 |
+| `power_level` | Puissance réelle, 1 à 5 | 29 |
+| `state_code` | État du poêle (code) | 1 |
+| `board_temperature` | Température de la carte mère | 28 |
+| `fume_fan_rpm` | Extracteur de fumées | 12 |
+| `auger_rpm`, `auger_rpm_set` | Vis sans fin, réelle et consigne | 14, 13 |
+| `active_set`, `active_live`, `active_temperature` | Valeurs Active, sans unité | 11, 21, 46 |
+| `profile` | Profil (code) | 18 |
+| `total_hours` | Heures de fonctionnement | 37 |
+| `hours_power_1` à `hours_power_5` | Heures par puissance | 38 à 42 |
+| `hours_to_service` | Heures avant entretien | 43 |
+| `ignitions` | Nombre d'allumages | 45 |
+| `minutes_to_switch_off` | Minutes avant extinction | 44 |
+| `wifi_probe_1` à `wifi_probe_3` | Sondes WiFi lues par le poêle | 52 à 54 |
+| `virtual_probe_temperature` | Dernière température envoyée par la sonde virtuelle | |
+| `virtual_probe_interval` | Intervalle demandé par le poêle, en minutes | |
 
-**Configuration**
+**Capteurs binaires (`binary_sensor`)**
 
-| Entité | Type |
-|---|---|
-| Sons | Interrupteur |
-| Sonde virtuelle | Interrupteur |
-| Régler l'heure du poêle | Bouton |
+| Clé | Contenu | Champ |
+|---|---|---|
+| `alarm` | Alarme (état 50 à 67) | 1 |
+| `brazier_dirty` | Brasier à nettoyer | 17 |
+| `igniter` | Bougie | 10 |
+| `link` | La carte mère répond sur la liaison série | |
 
-**Diagnostic**
+**Textes (`text_sensor`)**
 
-- État (code), Profil, Bougie, Liaison carte mère
-- Température carte mère, Extracteur fumées
-- Vis sans fin, Vis sans fin (consigne)
-- Active (consigne), Active (mesure), Active (température)
-- Heures de fonctionnement, totales et par puissance (1 à 5)
-- Heures avant entretien, Nombre d'allumages
-- Date et heure du poêle, Firmware carte mère
-- Sonde virtuelle : température envoyée, intervalle demandé, Sonde WiFi 1 (lue par le poêle)
-- Signal WiFi
-- Boutons Actualiser et Redémarrer le module
+| Clé | Contenu | Champ |
+|---|---|---|
+| `state` | État du poêle en clair | 1 |
+| `datetime` | Date et heure du poêle | 32 à 36 |
+| `firmware` | Firmware de la carte mère | 30 |
 
-**Entités internes (selon la configuration du poêle)**
+**Interrupteurs (`switch`)**
 
-Tout ce que la carte mère expose est déclaré dans le fichier. Ce qui dépend de la configuration du poêle (hydro, ballon, 2ᵉ canalisation, capteur de pellets…) est en `internal: true` : la donnée est décodée, mais l'entité n'apparaît pas dans Home Assistant. Passer `internal` à `false` sur les entités utiles à ton poêle.
-
-| Entité | Type | Champ lu | Paramètre écrit |
+| Clé | Contenu | Champ | Paramètre |
 |---|---|---|---|
-| Ventilation canalisée 2 | Liste : No Air / 1 à 5 / Automatique | 4 | 39 |
-| Température ballon tampon | Capteur, ÷ 2 | 7 | |
-| Température ballon sanitaire | Capteur, ÷ 2 | 8 | |
-| Température sonde NTC3 | Capteur, ÷ 2 | 9 | |
-| Température retour | Capteur, ÷ 2 | 59 | |
-| Vanne 3 voies | Texte : Sanitaire (1) / Chauffage | 15 | |
-| Pompe (PWM) | Capteur, valeur brute | 16 | |
-| Consigne ballon | Nombre, température × 2 | 27 | 51 |
-| Minutes avant extinction | Capteur | 44 | |
-| Niveau de pellets, Réservoir de pellets vide, Capteur de pellets (code) | Texte, binaire, capteur : 0 = pas de capteur, 10 = niveau correct, 11 = vide | 47 | |
-| Capteur de pellets | Interrupteur | 47 | 148 |
-| Sonde WiFi 2 et 3 (lues par le poêle) | Capteur, ÷ 2 | 53, 54 | |
-| Chronothermostat T1, T2, T3 | Nombre, température × 2, sans relecture | | 1108, 1109, 1110 |
-| Mode été | Interrupteur, sans relecture | | 58 |
-| Profil (réglage) | Nombre, valeur brute | 18 | 149 |
-| Unité de température (code) | Nombre, valeur brute | 48 | 49 |
-| Sleep (code) | Nombre, valeur brute | 50 | 57 |
-| Antigel (code) | Nombre, valeur brute | 60 | 154 |
-| Réinitialiser Active | Bouton | | 2 = `255` |
-| Charger la vis sans fin | Bouton | | 34 = `49` |
-| Adresse Modbus, Identifiant base de données, Mode (champ 51), Champ 55, Réglages (champs 56 à 58) | Capteurs, valeur brute | 19, 31, 51, 55, 56 à 58 | |
+| `power` | Marche / arrêt | 1 | 34 |
+| `eco_mode` | Mode éco | 23 | 41 |
+| `silent_mode` | Mode silencieux | 24 | 45 |
+| `active_mode` | Mode Active | 20 | 35 |
+| `chronothermostat` | Chronothermostat | 25 | 1111 |
+| `sounds` | Sons | 49 | 50 |
+| `virtual_probe` | Active la sonde virtuelle | | |
+
+**Listes (`select`)**
+
+| Clé | Contenu | Champ | Paramètre |
+|---|---|---|---|
+| `control_mode` | Mode de régulation | 22 | 40 |
+| `fan` | Ventilation frontale | 2 | 37 |
+| `ducted_fan_1` | Ventilation canalisée 1 | 3 | 38 |
+
+L'option `options` associe chaque valeur envoyée au poêle à un libellé, ce qui permet de les traduire :
+
+```yaml
+select:
+  - platform: mcz_maestro
+    control_mode:
+      name: "Mode de régulation"
+      options: { 0: "Manuel", 1: "Automatique" }
+```
+
+**Nombres (`number`)**
+
+| Clé | Contenu | Champ | Paramètre |
+|---|---|---|---|
+| `setpoint` | Consigne, 5 à 35 °C par pas de 0,5 | 26 | 42 |
+| `power` | Réglage de puissance, 1 à 5 (envoyé comme 11 à 15), refusé en mode automatique | 29 | 36 |
+
+**Boutons (`button`)**
+
+| Clé | Contenu | Paramètre |
+|---|---|---|
+| `refresh` | Demande la trame d'information | |
+| `reset_alarm` | Acquitte l'alarme | 1 = `255` |
+| `set_time` | Règle l'heure du poêle (option `time_id` du composant) | |
+
+**Entités selon la configuration du poêle**
+
+Ces entités concernent les poêles hydro, le ballon, la 2ᵉ canalisation et le capteur de pellets.
+
+| Plateforme | Clé | Contenu | Champ | Paramètre |
+|---|---|---|---|---|
+| `select` | `ducted_fan_2` | Ventilation canalisée 2 | 4 | 39 |
+| `sensor` | `puffer_temperature` | Température du ballon tampon | 7 | |
+| `sensor` | `boiler_temperature` | Température du ballon sanitaire | 8 | |
+| `sensor` | `ntc3_temperature` | Température de la sonde NTC3 | 9 | |
+| `sensor` | `return_temperature` | Température de retour | 59 | |
+| `sensor` | `pump_pwm` | Pompe, valeur brute | 16 | |
+| `text_sensor` | `valve_3way` | Vanne 3 voies : Sanitaire (1) / Chauffage | 15 | |
+| `number` | `boiler_setpoint` | Consigne du ballon | 27 | 51 |
+| `sensor` | `pellet_sensor_code` | Capteur de pellets : 0 = absent, 10 = niveau correct, 11 = vide | 47 | |
+| `text_sensor` | `pellet_level` | Niveau de pellets en clair | 47 | |
+| `binary_sensor` | `pellet_empty` | Réservoir de pellets vide | 47 | |
+| `switch` | `pellet_sensor` | Capteur de pellets | 47 | 148 |
+| `switch` | `summer_mode` | Mode été, sans relecture | | 58 |
+| `number` | `chrono_t1` à `chrono_t3` | Températures du chronothermostat, sans relecture | | 1108 à 1110 |
+| `number` | `profile` | Profil, valeur brute | 18 | 149 |
+| `number` | `temperature_unit` | Unité de température, valeur brute | 48 | 49 |
+| `number` | `sleep` | Sleep, valeur brute | 50 | 57 |
+| `number` | `antifreeze` | Antigel, valeur brute | 60 | 154 |
+| `button` | `reset_active` | Réinitialise la fonction Active | | 2 = `255` |
+| `button` | `load_auger` | Charge la vis sans fin | | 34 = `49` |
+| `sensor` | `modbus_address`, `database_id`, `field_51`, `field_55`, `set_puffer`, `set_boiler`, `set_health` | Valeurs brutes, sens non documenté | 19, 31, 51, 55, 56 à 58 | |
 
 - Ces entités viennent de la table de maestrogateway et **n'ont pas été testées** : le poêle étudié n'a aucune de ces options.
 - Pour les températures optionnelles, la valeur `255` est traitée comme « sonde absente ».
-- Le bouton « Charger la vis sans fin » amène des pellets dans le brasier : à n'utiliser que poêle éteint et froid.
-- Ne sont volontairement pas déclarées : les commandes de diagnostic (`C|Diagnostica|…`, pilotage direct de l'extracteur, de la vis, de la bougie, des ventilateurs, de la pompe et de la vanne) et la réinitialisation d'usine (paramètre 46). Elles restent accessibles par l'action `send_command`.
+- Le bouton `load_auger` amène des pellets dans le brasier : à n'utiliser que poêle éteint et froid.
+- Ne sont volontairement pas proposées : les commandes de diagnostic (`C|Diagnostica|…`, pilotage direct de l'extracteur, de la vis, de la bougie, des ventilateurs, de la pompe et de la vanne) et la réinitialisation d'usine (paramètre 46). Elles restent accessibles par une trame brute.
 
 ### Thermostat
 
-L'entité « Thermostat » regroupe la marche/arrêt, la consigne et la température ambiante dans une carte thermostat de Home Assistant.
+L'entité thermostat regroupe la marche/arrêt, la consigne et la température ambiante dans une carte thermostat de Home Assistant.
 
 | État du poêle | Mode affiché | Activité affichée |
 |---|---|---|
@@ -561,8 +634,8 @@ L'entité « Thermostat » regroupe la marche/arrêt, la consigne et la tempéra
 - Passer en mode chauffage envoie le paramètre 34 à `1` ; passer en arrêt l'envoie à `40`.
 - Changer la consigne envoie le paramètre 42, arrondi au demi-degré.
 - L'état affiché vient uniquement de ce que le poêle renvoie. Après une commande, il se met à jour à la trame d'information suivante.
-- Les préréglages « Manuel » et « Automatique » portent le mode de régulation : en choisir un envoie le paramètre 40.
-- Les entités « Marche », « Consigne » et « Mode de régulation » restent disponibles séparément, synchronisées avec le thermostat.
+- Les deux préréglages portent le mode de régulation : en choisir un envoie le paramètre 40.
+- Les entités `power`, `setpoint` et `control_mode` peuvent être déclarées en plus ; elles restent synchronisées avec le thermostat.
 
 ### Mode de régulation
 
@@ -571,20 +644,30 @@ Le poêle a deux modes de fonctionnement :
 - **Automatique** : il module lui-même sa puissance selon la consigne et la température ambiante. C'est le thermostat qui pilote le poêle.
 - **Manuel** : il fonctionne à la puissance choisie. La consigne du thermostat est sans effet ; le thermostat ne sert plus qu'à la marche et à l'arrêt.
 
-Le mode se choisit par les préréglages du thermostat ou par l'entité « Mode de régulation » ; les deux lisent le champ 22 et écrivent le paramètre 40 (0 = manuel, 1 = automatique).
+Le mode se choisit par les préréglages du thermostat ou par la liste `control_mode` ; les deux lisent le champ 22 et écrivent le paramètre 40 (0 = manuel, 1 = automatique).
 
 La puissance est exposée par deux entités :
 
-| Entité | Rôle |
+| Clé | Rôle |
 |---|---|
-| Puissance | Capteur en lecture seule : puissance réelle, dans les deux modes |
-| Puissance (réglage) | Commande, utile en mode manuel. En mode automatique, l'écriture est ignorée et un avertissement est écrit dans les logs |
+| `power_level` (`sensor`) | Lecture seule : puissance réelle, dans les deux modes |
+| `power` (`number`) | Commande, utile en mode manuel. En mode automatique, l'écriture est refusée et un avertissement est écrit dans les logs |
 
-Pour n'afficher que les commandes utiles, on peut conditionner la visibilité des cartes du tableau de bord à l'état de « Mode de régulation » : thermostat et capteur de puissance en automatique, réglage de puissance en manuel.
+Pour n'afficher que les commandes utiles, on peut conditionner la visibilité des cartes du tableau de bord à l'état de la liste `control_mode` : thermostat et capteur de puissance en automatique, réglage de puissance en manuel.
 
-### Action `send_command`
+### Trames brutes
 
-Envoie une trame brute depuis Home Assistant, sans le `^` final. Utile pour tester une commande non prévue.
+Le composant expose deux fonctions utilisables dans une lambda : `send_command("…")` envoie une trame brute, sans le `^` final, et `write_parameter(n°, valeur)` écrit un paramètre. Les exemples s'en servent pour offrir une action à Home Assistant, utile pour tester une commande non prévue :
+
+```yaml
+api:
+  actions:
+    - action: send_command
+      variables:
+        command: string
+      then:
+        - lambda: 'id(stove).send_command(command);'
+```
 
 ```yaml
 action: esphome.mcz_ego2_send_command
@@ -594,21 +677,30 @@ data:
 
 ### Sonde virtuelle
 
-Elle remplace la sonde d'ambiance déportée par un capteur de Home Assistant.
+Elle remplace la sonde d'ambiance déportée par un capteur de Home Assistant. Elle se configure dans le composant, avec l'option `virtual_probe`.
 
-- Trame envoyée : `C|RecuperaTemperaturaWiFi|<sonde>|<T × 2>|<version>|00|<qualité WiFi>`. Le numéro de sonde vient de la substitution `probe_id` : `51` pour la sonde 1 (valeur par défaut), `52` et `53` pour les sondes 2 et 3.
+| Option | Défaut | Rôle |
+|---|---|---|
+| `temperature_sensor` | | Identifiant du capteur ESPHome à envoyer, par exemple un capteur `homeassistant` |
+| `probe` | `1` | Sonde simulée : 1, 2 ou 3, envoyée comme `51`, `52` ou `53` |
+| `version` | `1.9.9` | Version annoncée par la sonde |
+| `require_api` | `true` | N'envoie que si Home Assistant est connecté |
+
+- Trame envoyée : `C|RecuperaTemperaturaWiFi|<sonde>|<T × 2>|<version>|00|<qualité WiFi>`.
 - La température est arrondie au demi-degré le plus proche (23,3 °C est envoyé comme 23,5 °C), ce qui évite le biais vers le bas d'une troncature.
 - Premier envoi 30 secondes après le démarrage, puis à l'intervalle renvoyé par le poêle, borné entre 1 et 30 minutes.
 - Aucun envoi si le capteur est indisponible ou si Home Assistant est injoignable.
-- L'interrupteur « Sonde virtuelle » est actif à chaque démarrage.
+- L'interrupteur `virtual_probe`, s'il est déclaré, permet de suspendre les envois ; il est actif à chaque démarrage.
 - Éteindre la sonde d'origine, sinon les deux envoient chacune leur température.
 - Si la sonde virtuelle cesse d'envoyer des températures valides, le poêle repasse automatiquement en mode manuel et l'application affiche « sonde wifi déconnectée ».
 
 ### Sécurités
 
-- **Aucune commande au démarrage.** Les interrupteurs de commande n'envoient rien tant qu'ils ne sont pas actionnés ; leur état vient uniquement de ce que le poêle renvoie. Dans ESPHome, un interrupteur se remet par défaut à « éteint » au démarrage et exécute son action d'extinction : sans ce réglage (`restore_mode: DISABLED`), le module envoyait six écritures à chaque démarrage, ce qui a mis le poêle en route lors d'un essai.
-- **Garde-fou.** Toute écriture est ignorée pendant les 20 premières secondes après le démarrage.
-- **Pas d'écriture en flash.** Les préférences ne sont jamais écrites en flash (`flash_write_interval: never`).
+- **Aucune commande au démarrage.** Le composant n'écrit rien tant qu'une entité n'est pas actionnée ; tous les états viennent de ce que le poêle renvoie. Une première version de la configuration utilisait des interrupteurs ESPHome génériques, qui se remettent par défaut à « éteint » au démarrage et exécutent leur action d'extinction : le module envoyait six écritures à chaque démarrage, ce qui a mis le poêle en route lors d'un essai.
+- **Garde-fou.** Toute écriture est ignorée pendant les 20 premières secondes après le démarrage (option `write_guard`).
+- **Puissance en mode automatique.** Le réglage de puissance est refusé tant que le poêle est en mode automatique.
+- **Pas d'écriture en flash.** Dans les exemples, les préférences ne sont jamais écrites en flash (`flash_write_interval: never`).
+
 
 ---
 

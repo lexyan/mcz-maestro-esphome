@@ -402,7 +402,7 @@ Erasing removes the leftovers of the old firmware, including the WiFi password s
 
 ### Writing the ESPHome firmware
 
-On ESP8266, ESPHome produces a single file, to be written at address `0x0`. It contains only the program (about 450 kB), not a complete flash image.
+On ESP8266, ESPHome produces a single file, to be written at address `0x0`. It contains only the program (about 470 kB), not a complete flash image.
 
 ```
 esptool --port COM3 --baud 115200 write-flash --flash-mode dout --flash-size 2MB 0x0 firmware.bin
@@ -428,33 +428,55 @@ esptool --port COM3 write-flash --flash-mode dout --flash-size 2MB 0x0 backup-wi
 
 ## 6. ESPHome configuration
 
-File: `mcz-poele.yaml`. It replaces the firmware of WiFi module 2 (cloud). WiFi module 1 (local) is not modified: the app in direct mode and the stove access point keep working.
+The firmware of WiFi module 2 (cloud) is replaced with ESPHome, using the `mcz_maestro` external component of the repository (`components/mcz_maestro` folder). WiFi module 1 (local) is not modified: the app in direct mode and the stove access point keep working.
 
-### External component `mcz_maestro`
+Two complete configurations are provided:
 
-The same configuration exists as an ESPHome component, in the `components/mcz_maestro` folder of the repository. With it, only the wanted entities are declared: those that are not listed are neither compiled nor exposed, which replaces the `internal` setting described below. The options and the list of entities are in `README.md`; `examples/full.yaml` shows every entity and `examples/mcz-ego2-fr.yaml` reproduces the configuration of this document.
-
-The protocol, the safeguards and the virtual probe described below apply to both forms.
+- `examples/mcz-ego2-fr.yaml`: the one of the stove studied, with French entity names;
+- `examples/full.yaml`: every available entity.
 
 ### Principle
 
 - The module connects to the home WiFi and to Home Assistant through the native ESPHome API.
-- It polls the mainboard with `C|RecuperoInfo` every 15 seconds and after each write.
+- It polls the mainboard with `C|RecuperoInfo` every 15 seconds, and once after each write or series of writes.
 - Only one command is in progress at a time on the serial link, with a 2-second timeout.
 - At startup, it sends the announcement `RispostaAccensioneRemoto|<MAC>|<version>`, like the original firmware.
+- Only the wanted entities are declared: those that are not listed are neither compiled nor exposed in Home Assistant.
 
-### Settings at the top of the file
+### Declaring the component
 
-| Substitution | Role |
-|---|---|
-| `name`, `friendly_name` | Device name |
-| `poll_interval` | Polling period of the mainboard |
-| `reboot_timeout` | Delay before restarting without WiFi or without Home Assistant |
-| `update_interval` | Period of the WiFi signal sensor |
-| `room_temp_entity` | Home Assistant sensor used by the virtual probe |
-| `probe_id` | Number of the simulated WiFi probe: `51`, `52` or `53` for probes 1 to 3 |
+```yaml
+external_components:
+  - source: github://lexyan/mcz-maestro-esphome
+    components: [ mcz_maestro ]
 
-Secrets expected in `secrets.yaml`: `wifi_ssid`, `wifi_password`, `esphome_encryption_key`, `ap_wifi_password`. OTA updates are encrypted with the API key.
+logger:
+  baud_rate: 0          # the serial link is reserved for the stove
+
+uart:
+  tx_pin: GPIO1
+  rx_pin: GPIO3
+  baud_rate: 115200
+
+mcz_maestro:
+  id: stove
+  time_id: ha_time
+  virtual_probe:
+    temperature_sensor: room_temperature
+    probe: 1
+```
+
+| Option | Default | Role |
+|---|---|---|
+| `update_interval` | `15s` | Polling period of the mainboard |
+| `language` | `en` | Language of the published texts (state, valve, pellets): `en` or `fr` |
+| `announce` | `true` | Announce the module to the mainboard at startup |
+| `module_version` | `1.2.6` | Version sent in that announcement |
+| `write_guard` | `20s` | Delay after startup during which no write is sent |
+| `time_id` | | Time source used by the `set_time` button |
+| `virtual_probe` | | Virtual probe (see below) |
+
+Secrets expected by the examples, in `secrets.yaml`: `wifi_ssid`, `wifi_password`, `esphome_encryption_key`, `ap_wifi_password`. OTA updates are encrypted with the API key.
 
 ### Hardware
 
@@ -468,91 +490,141 @@ Secrets expected in `secrets.yaml`: `wifi_ssid`, `wifi_password`, `esphome_encry
 
 ### Entities
 
-**Sensors**
+Each entity is declared by its key, under the matching platform:
 
-| Entity | Type |
-|---|---|
-| Température ambiante (room temperature) | Sensor |
-| Température fumées (flue gas temperature) | Sensor |
-| Puissance (power) | Sensor, read-only |
-| État (state) | Text |
-| Alarme (alarm) | Binary |
-| Brasier à nettoyer (brazier needs cleaning) | Binary |
+```yaml
+sensor:
+  - platform: mcz_maestro
+    ambient_temperature:
+      name: "Room temperature"
+```
 
-**Controls**
+The name is free. The "Field" and "Parameter" columns refer to part 3.
 
-| Entity | Type | Parameter |
+**Thermostat (`climate`)**
+
+A single entity, without a key: off / heat, setpoint, room temperature and two presets for the regulation mode. The `manual_preset` and `auto_preset` options set their labels ("Manual" and "Auto" by default). Parameters 34, 42 and 40.
+
+**Sensors (`sensor`)**
+
+| Key | Content | Field |
 |---|---|---|
-| Thermostat | Climate (off / heat, setpoint, room temperature, presets Manuel / Automatique) | 34, 42 and 40 |
-| Marche (on/off) | Switch | 34 |
-| Consigne (setpoint) | Number, 5 to 35 °C in steps of 0.5 | 42 |
-| Mode de régulation (regulation mode) | Select: Manuel / Automatique | 40 |
-| Puissance (réglage) (power setting) | Number, 1 to 5 (sent as 11 to 15), ignored in automatic mode | 36 |
-| Ventilation (front fan) | Select: No Air / 1 to 5 / Automatique | 37 |
-| Ventilation canalisée (ducted fan) | Select: No Air / 1 to 5 / Automatique | 38 |
-| Mode éco (eco mode) | Switch | 41 |
-| Mode silencieux (silent mode) | Switch | 45 |
-| Mode Active (Active mode) | Switch | 35 |
-| Chronothermostat | Switch | 1111 |
-| Acquitter l'alarme (acknowledge alarm) | Button | 1 |
+| `ambient_temperature` | Room temperature | 6 |
+| `fume_temperature` | Flue gas temperature | 5 |
+| `power_level` | Actual power level, 1 to 5 | 29 |
+| `state_code` | Stove state (code) | 1 |
+| `board_temperature` | Mainboard temperature | 28 |
+| `fume_fan_rpm` | Flue gas extractor | 12 |
+| `auger_rpm`, `auger_rpm_set` | Auger, actual and setpoint | 14, 13 |
+| `active_set`, `active_live`, `active_temperature` | Active values, no unit | 11, 21, 46 |
+| `profile` | Profile (code) | 18 |
+| `total_hours` | Operating hours | 37 |
+| `hours_power_1` to `hours_power_5` | Hours per power level | 38 to 42 |
+| `hours_to_service` | Hours before service | 43 |
+| `ignitions` | Number of ignitions | 45 |
+| `minutes_to_switch_off` | Minutes to switch-off | 44 |
+| `wifi_probe_1` to `wifi_probe_3` | WiFi probes as read back by the stove | 52 to 54 |
+| `virtual_probe_temperature` | Last temperature sent by the virtual probe | |
+| `virtual_probe_interval` | Interval requested by the stove, in minutes | |
 
-**Configuration**
+**Binary sensors (`binary_sensor`)**
 
-| Entity | Type |
-|---|---|
-| Sons (sounds) | Switch |
-| Sonde virtuelle (virtual probe) | Switch |
-| Régler l'heure du poêle (set stove clock) | Button |
+| Key | Content | Field |
+|---|---|---|
+| `alarm` | Alarm (state 50 to 67) | 1 |
+| `brazier_dirty` | Brazier needs cleaning | 17 |
+| `igniter` | Igniter | 10 |
+| `link` | The mainboard answers on the serial link | |
 
-**Diagnostic**
+**Texts (`text_sensor`)**
 
-- State code, profile, igniter, mainboard link
-- Mainboard temperature, flue gas extractor
-- Auger, auger setpoint
-- Active setpoint, Active measured value, Active temperature
-- Operating hours, total and per power level (1 to 5)
-- Hours before service, number of ignitions
-- Stove date and time, mainboard firmware
-- Virtual probe: temperature sent, interval requested, WiFi probe 1 as read back by the stove
-- WiFi signal
-- Refresh and restart-module buttons
+| Key | Content | Field |
+|---|---|---|
+| `state` | Stove state in plain text | 1 |
+| `datetime` | Stove date and time | 32 to 36 |
+| `firmware` | Mainboard firmware | 30 |
 
-**Internal entities (depending on the stove configuration)**
+**Switches (`switch`)**
 
-Everything the mainboard exposes is declared in the file. Whatever depends on the stove configuration (hydro, boiler, second ducted fan, pellet sensor…) is set to `internal: true`: the value is decoded, but the entity does not appear in Home Assistant. Set `internal` to `false` on the entities that apply to your stove.
-
-| Entity | Type | Field read | Parameter written |
+| Key | Content | Field | Parameter |
 |---|---|---|---|
-| Ventilation canalisée 2 (ducted fan 2) | Select: No Air / 1 to 5 / Automatique | 4 | 39 |
-| Température ballon tampon (buffer tank temperature) | Sensor, ÷ 2 | 7 | |
-| Température ballon sanitaire (boiler temperature) | Sensor, ÷ 2 | 8 | |
-| Température sonde NTC3 (NTC3 probe temperature) | Sensor, ÷ 2 | 9 | |
-| Température retour (return temperature) | Sensor, ÷ 2 | 59 | |
-| Vanne 3 voies (3-way valve) | Text: Sanitaire (1) / Chauffage | 15 | |
-| Pompe (PWM) (pump) | Sensor, raw value | 16 | |
-| Consigne ballon (boiler setpoint) | Number, temperature × 2 | 27 | 51 |
-| Minutes avant extinction (minutes to switch-off) | Sensor | 44 | |
-| Niveau de pellets, Réservoir de pellets vide, Capteur de pellets (code) (pellet level) | Text, binary, sensor: 0 = no sensor, 10 = enough pellets, 11 = empty | 47 | |
-| Capteur de pellets (pellet sensor) | Switch | 47 | 148 |
-| Sonde WiFi 2 and 3 (as read back by the stove) | Sensor, ÷ 2 | 53, 54 | |
-| Chronothermostat T1, T2, T3 | Number, temperature × 2, no read-back | | 1108, 1109, 1110 |
-| Mode été (summer mode) | Switch, no read-back | | 58 |
-| Profil (réglage) (profile setting) | Number, raw value | 18 | 149 |
-| Unité de température (code) (temperature unit) | Number, raw value | 48 | 49 |
-| Sleep (code) | Number, raw value | 50 | 57 |
-| Antigel (code) (antifreeze) | Number, raw value | 60 | 154 |
-| Réinitialiser Active (reset Active) | Button | | 2 = `255` |
-| Charger la vis sans fin (load the auger) | Button | | 34 = `49` |
-| Modbus address, database ID, Mode (field 51), field 55, settings (fields 56 to 58) | Sensors, raw value | 19, 31, 51, 55, 56 to 58 | |
+| `power` | On / off | 1 | 34 |
+| `eco_mode` | Eco mode | 23 | 41 |
+| `silent_mode` | Silent mode | 24 | 45 |
+| `active_mode` | Active mode | 20 | 35 |
+| `chronothermostat` | Chronothermostat | 25 | 1111 |
+| `sounds` | Sounds | 49 | 50 |
+| `virtual_probe` | Enables the virtual probe | | |
+
+**Selects (`select`)**
+
+| Key | Content | Field | Parameter |
+|---|---|---|---|
+| `control_mode` | Regulation mode | 22 | 40 |
+| `fan` | Front fan | 2 | 37 |
+| `ducted_fan_1` | Ducted fan 1 | 3 | 38 |
+
+The `options` option maps each value sent to the stove to a label, so that labels can be translated:
+
+```yaml
+select:
+  - platform: mcz_maestro
+    control_mode:
+      name: "Mode de régulation"
+      options: { 0: "Manuel", 1: "Automatique" }
+```
+
+**Numbers (`number`)**
+
+| Key | Content | Field | Parameter |
+|---|---|---|---|
+| `setpoint` | Setpoint, 5 to 35 °C in steps of 0.5 | 26 | 42 |
+| `power` | Power setting, 1 to 5 (sent as 11 to 15), refused in automatic mode | 29 | 36 |
+
+**Buttons (`button`)**
+
+| Key | Content | Parameter |
+|---|---|---|
+| `refresh` | Requests the information frame | |
+| `reset_alarm` | Acknowledges the alarm | 1 = `255` |
+| `set_time` | Sets the stove clock (`time_id` option of the component) | |
+
+**Entities depending on the stove configuration**
+
+These entities are for hydro stoves, the boiler, the second ducted fan and the pellet sensor.
+
+| Platform | Key | Content | Field | Parameter |
+|---|---|---|---|---|
+| `select` | `ducted_fan_2` | Ducted fan 2 | 4 | 39 |
+| `sensor` | `puffer_temperature` | Buffer tank temperature | 7 | |
+| `sensor` | `boiler_temperature` | Boiler temperature | 8 | |
+| `sensor` | `ntc3_temperature` | NTC3 probe temperature | 9 | |
+| `sensor` | `return_temperature` | Return temperature | 59 | |
+| `sensor` | `pump_pwm` | Pump, raw value | 16 | |
+| `text_sensor` | `valve_3way` | 3-way valve: domestic hot water (1) / heating | 15 | |
+| `number` | `boiler_setpoint` | Boiler setpoint | 27 | 51 |
+| `sensor` | `pellet_sensor_code` | Pellet sensor: 0 = no sensor, 10 = level OK, 11 = empty | 47 | |
+| `text_sensor` | `pellet_level` | Pellet level in plain text | 47 | |
+| `binary_sensor` | `pellet_empty` | Pellet tank empty | 47 | |
+| `switch` | `pellet_sensor` | Pellet sensor | 47 | 148 |
+| `switch` | `summer_mode` | Summer mode, no read-back | | 58 |
+| `number` | `chrono_t1` to `chrono_t3` | Chronothermostat temperatures, no read-back | | 1108 to 1110 |
+| `number` | `profile` | Profile, raw value | 18 | 149 |
+| `number` | `temperature_unit` | Temperature unit, raw value | 48 | 49 |
+| `number` | `sleep` | Sleep, raw value | 50 | 57 |
+| `number` | `antifreeze` | Antifreeze, raw value | 60 | 154 |
+| `button` | `reset_active` | Resets the Active function | | 2 = `255` |
+| `button` | `load_auger` | Loads the auger | | 34 = `49` |
+| `sensor` | `modbus_address`, `database_id`, `field_51`, `field_55`, `set_puffer`, `set_boiler`, `set_health` | Raw values, meaning not documented | 19, 31, 51, 55, 56 to 58 | |
 
 - These entities come from the maestrogateway table and **have not been tested**: the stove studied has none of these options.
 - For the optional temperatures, the value `255` is treated as "probe absent".
-- The "Charger la vis sans fin" button feeds pellets into the brazier: use it only with the stove off and cold.
-- Deliberately not declared: the diagnostic commands (`C|Diagnostica|…`, direct control of the extractor, the auger, the igniter, the fans, the pump and the valve) and the factory reset (parameter 46). They remain reachable through the `send_command` action.
+- The `load_auger` button feeds pellets into the brazier: use it only with the stove off and cold.
+- Deliberately not offered: the diagnostic commands (`C|Diagnostica|…`, direct control of the extractor, the auger, the igniter, the fans, the pump and the valve) and the factory reset (parameter 46). They remain reachable with a raw frame.
 
 ### Thermostat
 
-The "Thermostat" entity groups on/off, the setpoint and the room temperature in a Home Assistant thermostat card.
+The thermostat entity groups on/off, the setpoint and the room temperature in a Home Assistant thermostat card.
 
 | Stove state | Mode shown | Activity shown |
 |---|---|---|
@@ -563,8 +635,8 @@ The "Thermostat" entity groups on/off, the setpoint and the room temperature in 
 - Switching to heat mode sends parameter 34 with `1`; switching to off sends it with `40`.
 - Changing the setpoint sends parameter 42, rounded to the half degree.
 - The state shown comes only from what the stove reports. After a command, it is updated with the next information frame.
-- The "Manuel" and "Automatique" presets carry the regulation mode: choosing one sends parameter 40.
-- The "Marche", "Consigne" and "Mode de régulation" entities remain available separately, kept in sync with the thermostat.
+- The two presets carry the regulation mode: choosing one sends parameter 40.
+- The `power`, `setpoint` and `control_mode` entities can be declared as well; they stay in sync with the thermostat.
 
 ### Regulation mode
 
@@ -573,44 +645,63 @@ The stove has two operating modes:
 - **Automatic**: it modulates its own power according to the setpoint and the room temperature. The thermostat drives the stove.
 - **Manual**: it runs at the chosen power level. The thermostat setpoint has no effect; the thermostat is only used to turn the stove on and off.
 
-The mode is chosen with the thermostat presets or with the "Mode de régulation" entity; both read field 22 and write parameter 40 (0 = manual, 1 = automatic).
+The mode is chosen with the thermostat presets or with the `control_mode` select; both read field 22 and write parameter 40 (0 = manual, 1 = automatic).
 
 Power is exposed by two entities:
 
-| Entity | Role |
+| Key | Role |
 |---|---|
-| Puissance | Read-only sensor: actual power level, in both modes |
-| Puissance (réglage) | Control, useful in manual mode. In automatic mode, the write is ignored and a warning is written to the logs |
+| `power_level` (`sensor`) | Read-only: actual power level, in both modes |
+| `power` (`number`) | Control, useful in manual mode. In automatic mode, the write is refused and a warning is written to the logs |
 
-To show only the useful controls, the visibility of the dashboard cards can be tied to the state of "Mode de régulation": thermostat and power sensor in automatic mode, power setting in manual mode.
+To show only the useful controls, the visibility of the dashboard cards can be tied to the state of the `control_mode` select: thermostat and power sensor in automatic mode, power setting in manual mode.
 
-### `send_command` action
+### Raw frames
 
-Sends a raw frame from Home Assistant, without the final `^`. Useful for testing a command that is not covered.
+The component exposes two functions usable in a lambda: `send_command("…")` sends a raw frame, without the final `^`, and `write_parameter(no., value)` writes a parameter. The examples use them to offer an action to Home Assistant, useful for testing a command that is not covered:
 
 ```yaml
-action: esphome.mcz_ego2_send_command
+api:
+  actions:
+    - action: send_command
+      variables:
+        command: string
+      then:
+        - lambda: 'id(stove).send_command(command);'
+```
+
+```yaml
+action: esphome.mcz_stove_send_command
 data:
   command: "C|WriteParametri|42|43"
 ```
 
 ### Virtual probe
 
-It replaces the remote room probe with a Home Assistant sensor.
+It replaces the remote room probe with a Home Assistant sensor. It is configured in the component, with the `virtual_probe` option.
 
-- Frame sent: `C|RecuperaTemperaturaWiFi|<probe>|<T × 2>|<version>|00|<WiFi quality>`. The probe number comes from the `probe_id` substitution: `51` for probe 1 (default), `52` and `53` for probes 2 and 3.
+| Option | Default | Role |
+|---|---|---|
+| `temperature_sensor` | | Id of the ESPHome sensor to send, for example a `homeassistant` sensor |
+| `probe` | `1` | Probe simulated: 1, 2 or 3, sent as `51`, `52` or `53` |
+| `version` | `1.9.9` | Version announced by the probe |
+| `require_api` | `true` | Send only while Home Assistant is connected |
+
+- Frame sent: `C|RecuperaTemperaturaWiFi|<probe>|<T × 2>|<version>|00|<WiFi quality>`.
 - The temperature is rounded to the nearest half degree (23.3 °C is sent as 23.5 °C), which avoids the downward bias of truncation.
 - First transmission 30 seconds after startup, then at the interval returned by the stove, bounded between 1 and 30 minutes.
 - Nothing is sent if the sensor is unavailable or if Home Assistant cannot be reached.
-- The "Sonde virtuelle" switch is on at every startup.
+- The `virtual_probe` switch, if declared, suspends the transmissions; it is on at every startup.
 - Turn off the original probe, otherwise both send their own temperature.
 - If the virtual probe stops sending valid temperatures, the stove automatically goes back to manual mode and the app reports the WiFi probe as disconnected.
 
 ### Safeguards
 
-- **No command at startup.** The control switches send nothing until they are operated; their state comes only from what the stove reports. In ESPHome, a switch returns to "off" by default at startup and runs its turn-off action: without this setting (`restore_mode: DISABLED`), the module sent six writes at every startup, which started the stove during a test.
-- **Guard.** Every write is ignored during the first 20 seconds after startup.
-- **No flash writes.** Preferences are never written to flash (`flash_write_interval: never`).
+- **No command at startup.** The component writes nothing until an entity is operated; every state comes from what the stove reports. An early version of the configuration used generic ESPHome switches, which return to "off" by default at startup and run their turn-off action: the module sent six writes at every startup, which started the stove during a test.
+- **Guard.** Every write is ignored during the first 20 seconds after startup (`write_guard` option).
+- **Power in automatic mode.** The power setting is refused while the stove is in automatic mode.
+- **No flash writes.** In the examples, preferences are never written to flash (`flash_write_interval: never`).
+
 
 ---
 
