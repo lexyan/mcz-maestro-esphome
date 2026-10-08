@@ -489,8 +489,10 @@ static bool format_timestamp(uint32_t timestamp, char *buf, size_t size) {
   struct tm tm;
   if (gmtime_r(&t, &tm) == nullptr)
     return false;
-  snprintf(buf, size, "%04d-%02d-%02d %02d:%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour,
-           tm.tm_min);
+  // Values bounded explicitly, so that the compiler knows the text fits in the buffer
+  snprintf(buf, size, "%04u-%02u-%02u %02u:%02u", (unsigned) (tm.tm_year + 1900) % 10000u,
+           (unsigned) (tm.tm_mon + 1) % 100u, (unsigned) tm.tm_mday % 100u, (unsigned) tm.tm_hour % 100u,
+           (unsigned) tm.tm_min % 100u);
   return true;
 }
 
