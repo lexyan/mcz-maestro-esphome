@@ -11,7 +11,7 @@ void MczButton::press_action() {
       this->parent_->sync_time();
       break;
     default:
-      this->parent_->request_info();
+      this->parent_->refresh_all();
       break;
   }
 }

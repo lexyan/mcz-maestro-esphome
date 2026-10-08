@@ -586,7 +586,7 @@ select:
 
 | Key | Content | Parameter |
 |---|---|---|
-| `refresh` | Requests the information frame | |
+| `refresh` | Reads the information frame and the other frames in use (recipes, settings, alarms…) | |
 | `reset_alarm` | Acknowledges the alarm | 1 = `255` |
 | `set_time` | Sets the stove clock (`time_id` option of the component) | |
 | `reset_service` | Resets the service counter ("hours before service") | 43 = `0` |
@@ -723,7 +723,7 @@ These entities mirror menus of the MCZ app. They are read from frames other than
 | WiFi probe | `C\|RecuperoSondeWiFi` | `0B` | At startup, after a write, then every 10 minutes |
 | Alarms | `C\|RecuperaAllarmi` | `0A` | At startup, when an alarm appears or clears, then every 10 minutes |
 
-- Until a frame has been answered, it is requested again every minute.
+- Until a frame has been answered, it is requested again every minute. The `refresh` button also reads all these frames again, so a setting changed from the app shows up at once.
 - Choosing "Thermostat" as the room input also switches the stove to automatic regulation (parameter 40), as the app does.
 - The virtual probe sends nothing unless the room input is "WiFi probe": otherwise its temperature would replace the reading of the stove's own probe (observed on the stove). The room input is read for this even if the `room_input` select is not declared; going back to "WiFi probe" resumes the transmissions at once.
 - Dates are those of the stove's clock.

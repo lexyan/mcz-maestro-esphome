@@ -585,7 +585,7 @@ select:
 
 | Clé | Contenu | Paramètre |
 |---|---|---|
-| `refresh` | Demande la trame d'information | |
+| `refresh` | Relit la trame d'information et les autres trames utilisées (recettes, réglages, alarmes…) | |
 | `reset_alarm` | Acquitte l'alarme | 1 = `255` |
 | `set_time` | Règle l'heure du poêle (option `time_id` du composant) | |
 | `reset_service` | Remet à zéro le compteur d'entretien (« heures avant entretien ») | 43 = `0` |
@@ -722,7 +722,7 @@ Ces entités reprennent des menus de l'application MCZ. Elles sont lues par d'au
 | Sonde WiFi | `C\|RecuperoSondeWiFi` | `0B` | Au démarrage, après une écriture, puis toutes les 10 minutes |
 | Alarmes | `C\|RecuperaAllarmi` | `0A` | Au démarrage, quand une alarme apparaît ou disparaît, puis toutes les 10 minutes |
 
-- Tant qu'une trame n'a pas reçu de réponse, elle est redemandée chaque minute.
+- Tant qu'une trame n'a pas reçu de réponse, elle est redemandée chaque minute. Le bouton `refresh` relit aussi toutes ces trames, ce qui fait apparaître aussitôt un réglage changé depuis l'application.
 - Choisir « Thermostat » pour l'entrée ambiance passe aussi le poêle en régulation automatique (paramètre 40), comme le fait l'application.
 - La sonde virtuelle n'envoie rien tant que l'entrée ambiance n'est pas « Sonde WiFi » : sinon sa température remplacerait la mesure de la sonde du poêle (constaté sur le poêle). L'entrée ambiance est lue pour cela même si la liste `room_input` n'est pas déclarée ; revenir sur « Sonde WiFi » relance l'envoi aussitôt.
 - Les dates sont celles de l'horloge du poêle.

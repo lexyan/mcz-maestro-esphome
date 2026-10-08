@@ -206,6 +206,14 @@ class MczMaestro : public PollingComponent, public uart::UARTDevice {
   void request_info();
   /// Queue a request for an auxiliary frame.
   void request_aux(MczAuxKind kind);
+  /// Request the information frame and every auxiliary frame in use.
+  void refresh_all() {
+    this->request_info();
+    for (uint8_t kind = 0; kind < AUX_COUNT; kind++) {
+      if (this->aux_[kind].enabled)
+        this->request_aux((MczAuxKind) kind);
+    }
+  }
   /// Read an auxiliary frame again once the pending writes are sent.
   void refresh_aux(MczAuxKind kind) {
     if (this->aux_[kind].enabled)

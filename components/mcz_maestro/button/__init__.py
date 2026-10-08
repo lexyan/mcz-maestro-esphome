@@ -13,7 +13,7 @@ WRITE = MczButtonKind.BUTTON_WRITE
 
 # key: (kind, write parameter, value, schema)
 BUTTONS = {
-    # Request the information frame now
+    # Read the information frame and every other frame in use now
     "refresh": (
         MczButtonKind.BUTTON_REFRESH,
         0,
