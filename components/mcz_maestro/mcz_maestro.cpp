@@ -481,6 +481,16 @@ static std::string text_field(const std::string &frame, size_t start, uint8_t in
   return "";
 }
 
+// Number of characters of a UTF-8 text (Home Assistant limits a state to 255 characters).
+static size_t utf8_length(const std::string &text) {
+  size_t length = 0;
+  for (unsigned char c : text) {
+    if ((c & 0xC0) != 0x80)
+      length++;
+  }
+  return length;
+}
+
 // The stove counts seconds since 1970 on its own clock: the date is shown as the stove sees it.
 static bool format_timestamp(uint32_t timestamp, char *buf, size_t size) {
   if (timestamp == 0 || timestamp == 0xFFFFFFFFUL)
@@ -660,18 +670,23 @@ void MczMaestro::handle_alarms_() {
   }
   this->publish_text_(TEXT_LAST_ALARM, last);
 
-  // Short form, to stay within the 255 characters of a Home Assistant state
+  // Same form as the last alarm, most recent first. An entry that would take the text
+  // past the 255 characters of a Home Assistant state is left out, with the older ones.
   std::string history;
+  history.reserve(256);
   for (size_t i = 0; i < count && i < MAX_ALARMS; i++) {
-    if (i != 0)
-      history += ", ";
-    const char *text = state_text(alarms[i].state);
-    const char *dash = strstr(text, " - ");
-    history.append(text, dash != nullptr ? (size_t) (dash - text) : strlen(text));
+    std::string entry = state_text(alarms[i].state);
     if (format_timestamp(alarms[i].timestamp, date, sizeof(date))) {
-      history += " ";
-      history += date;
+      entry += " (";
+      entry += date;
+      entry += ")";
     }
+    const size_t separator = history.empty() ? 0 : 3;
+    if (utf8_length(history) + separator + utf8_length(entry) > 255)
+      break;
+    if (separator != 0)
+      history += " | ";
+    history += entry;
   }
   this->publish_text_(TEXT_ALARM_HISTORY, history);
 #endif

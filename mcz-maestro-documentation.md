@@ -703,7 +703,7 @@ Ces entités reprennent des menus de l'application MCZ. Elles sont lues par d'au
 | Plateforme | Clé | Contenu |
 |---|---|---|
 | `text_sensor` | `last_alarm` | Dernière alarme et sa date |
-| `text_sensor` | `alarm_history` | Cinq dernières alarmes, en forme courte |
+| `text_sensor` | `alarm_history` | Cinq dernières alarmes avec leur description et leur date, séparées par « \| » |
 | `text_sensor` | `wifi_probe_last_seen` | Dernière connexion de la sonde WiFi |
 | `sensor` | `wifi_probe_signal` | Signal de la sonde WiFi vu par le poêle, en % |
 | `text_sensor` | `bootloader_version`, `wifi_direct_version`, `wifi_remote_version`, `wifi_probe_version` | Versions du bootloader, des modules WiFi 1 et 2 et de la sonde |

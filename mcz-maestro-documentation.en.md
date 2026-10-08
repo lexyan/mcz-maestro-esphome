@@ -704,7 +704,7 @@ These entities mirror menus of the MCZ app. They are read from frames other than
 | Platform | Key | Content |
 |---|---|---|
 | `text_sensor` | `last_alarm` | Last alarm and its date |
-| `text_sensor` | `alarm_history` | Last five alarms, in short form |
+| `text_sensor` | `alarm_history` | Last five alarms with their description and date, separated by "\|" |
 | `text_sensor` | `wifi_probe_last_seen` | Last connection of the WiFi probe |
 | `sensor` | `wifi_probe_signal` | Signal of the WiFi probe as seen by the stove, in % |
 | `text_sensor` | `bootloader_version`, `wifi_direct_version`, `wifi_remote_version`, `wifi_probe_version` | Versions of the bootloader, of WiFi modules 1 and 2 and of the probe |

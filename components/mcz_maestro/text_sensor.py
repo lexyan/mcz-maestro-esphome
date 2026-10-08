@@ -102,7 +102,7 @@ AUX_TEXT_SENSORS = {
         AUX_PROBES,
         _diagnostic("mdi:clock-check-outline"),
     ),
-    # Most recent alarm, and the last five in short form
+    # Most recent alarm, and the last five alarms with their description and date
     "last_alarm": (
         MczTextKind.TEXT_LAST_ALARM,
         AUX_ALARMS,
