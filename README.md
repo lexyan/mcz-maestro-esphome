@@ -67,7 +67,7 @@ select:
 | Option | Default | Role |
 |---|---|---|
 | `update_interval` | `15s` | Polling period of the mainboard |
-| `language` | `en` | Language of the text sensors: `en` or `fr` |
+| `language` | `en` | Language of the text sensors: `en`, `fr` or `de` |
 | `announce` | `true` | Announce the module to the mainboard at start-up, like the original firmware |
 | `module_version` | `1.2.6` | Version sent in that announcement |
 | `write_guard` | `20s` | No parameter is written to the stove during this delay after boot |

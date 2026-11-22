@@ -76,7 +76,7 @@ CONFIG_SCHEMA = (
                 CONF_WRITE_GUARD, default="20s"
             ): cv.positive_time_period_milliseconds,
             # Language of the texts published by the text sensors
-            cv.Optional(CONF_LANGUAGE, default="en"): cv.one_of("en", "fr", lower=True),
+            cv.Optional(CONF_LANGUAGE, default="en"): cv.one_of("en", "fr", "de", lower=True),
             # Time source used by the "set_time" button and by sync_time()
             cv.Optional(CONF_TIME_ID): cv.use_id(time.RealTimeClock),
             # One probe, or a list of up to three (one per probe number)
@@ -111,6 +111,8 @@ async def to_code(config):
     cg.add(var.set_write_guard(config[CONF_WRITE_GUARD]))
     if config[CONF_LANGUAGE] == "fr":
         cg.add_define("MCZ_MAESTRO_LANG_FR")
+    elif config[CONF_LANGUAGE] == "de":
+        cg.add_define("MCZ_MAESTRO_LANG_DE")
 
     if CONF_TIME_ID in config:
         time_ = await cg.get_variable(config[CONF_TIME_ID])

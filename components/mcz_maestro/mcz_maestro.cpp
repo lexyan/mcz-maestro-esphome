@@ -48,10 +48,12 @@ static const size_t PROBE_COMMAND_LEN = 26;
 static const uint8_t PROBE_ID_BASE = 51;  // probes 1, 2 and 3 are sent as 51, 52 and 53
 
 // Texts are chosen at build time with the "language" option of the component.
-#ifdef MCZ_MAESTRO_LANG_FR
-#define MCZ_T(en, fr) fr
+#if defined(MCZ_MAESTRO_LANG_FR)
+#define MCZ_T(en, fr, de) fr
+#elif defined(MCZ_MAESTRO_LANG_DE)
+#define MCZ_T(en, fr, de) de
 #else
-#define MCZ_T(en, fr) en
+#define MCZ_T(en, fr, de) en
 #endif
 
 bool mcz_state_is_burning(uint32_t state) { return (state >= 1 && state <= 15) || state == 31; }
@@ -62,98 +64,98 @@ bool mcz_state_is_on(uint32_t state) { return mcz_state_is_burning(state) || (st
 static const char *state_text(uint32_t state) {
   switch (state) {
     case 0:
-      return MCZ_T("Off", "Éteint");
+      return MCZ_T("Off", "Éteint", "Aus");
     case 1:
-      return MCZ_T("Checking hot or cold", "Contrôle chaud/froid");
+      return MCZ_T("Checking hot or cold", "Contrôle chaud/froid", "Zündung: Prüfung");
     case 2:
-      return MCZ_T("Cleaning, cold", "Nettoyage à froid");
+      return MCZ_T("Cleaning, cold", "Nettoyage à froid", "Zündung: Reinigung");
     case 3:
-      return MCZ_T("Loading pellets, cold", "Chargement pellets à froid");
+      return MCZ_T("Loading pellets, cold", "Chargement pellets à froid", "Zündung: Pellets laden");
     case 4:
-      return MCZ_T("Start 1, cold", "Démarrage 1 à froid");
+      return MCZ_T("Start 1, cold", "Démarrage 1 à froid", "Zündung: Start 1");
     case 5:
-      return MCZ_T("Start 2, cold", "Démarrage 2 à froid");
+      return MCZ_T("Start 2, cold", "Démarrage 2 à froid", "Zündung: Start 2");
     case 6:
-      return MCZ_T("Cleaning, hot", "Nettoyage à chaud");
+      return MCZ_T("Cleaning, hot", "Nettoyage à chaud", "Zündung warm: Reinigung");
     case 7:
-      return MCZ_T("Loading pellets, hot", "Chargement pellets à chaud");
+      return MCZ_T("Loading pellets, hot", "Chargement pellets à chaud", "Zündung warm: Pellets laden");
     case 8:
-      return MCZ_T("Start 1, hot", "Démarrage 1 à chaud");
+      return MCZ_T("Start 1, hot", "Démarrage 1 à chaud", "Zündung warm: Start 1");
     case 9:
-      return MCZ_T("Start 2, hot", "Démarrage 2 à chaud");
+      return MCZ_T("Start 2, hot", "Démarrage 2 à chaud", "Zündung warm: Start 2");
     case 10:
-      return MCZ_T("Stabilising", "Stabilisation");
+      return MCZ_T("Stabilising", "Stabilisation", "Stabilisierung");
     case 11:
-      return MCZ_T("Power 1", "Puissance 1");
+      return MCZ_T("Power 1", "Puissance 1", "Heizt · Stufe 1");
     case 12:
-      return MCZ_T("Power 2", "Puissance 2");
+      return MCZ_T("Power 2", "Puissance 2", "Heizt · Stufe 2");
     case 13:
-      return MCZ_T("Power 3", "Puissance 3");
+      return MCZ_T("Power 3", "Puissance 3", "Heizt · Stufe 3");
     case 14:
-      return MCZ_T("Power 4", "Puissance 4");
+      return MCZ_T("Power 4", "Puissance 4", "Heizt · Stufe 4");
     case 15:
-      return MCZ_T("Power 5", "Puissance 5");
+      return MCZ_T("Power 5", "Puissance 5", "Heizt · Stufe 5");
     case 30:
     case 48:
-      return MCZ_T("Diagnostics", "Diagnostic");
+      return MCZ_T("Diagnostics", "Diagnostic", "Diagnose");
     case 31:
-      return MCZ_T("On", "Allumé");
+      return MCZ_T("On", "Allumé", "An");
     case 40:
-      return MCZ_T("Extinguishing", "Extinction");
+      return MCZ_T("Extinguishing", "Extinction", "Ausbrennen");
     case 41:
-      return MCZ_T("Cooling", "Refroidissement");
+      return MCZ_T("Cooling", "Refroidissement", "Abkühlen");
     case 42:
-      return MCZ_T("Cleaning, low", "Nettoyage bas");
+      return MCZ_T("Cleaning, low", "Nettoyage bas", "Heizt · Reinigung schwach");
     case 43:
-      return MCZ_T("Cleaning, high", "Nettoyage haut");
+      return MCZ_T("Cleaning, high", "Nettoyage haut", "Heizt · Reinigung stark");
     case 44:
-      return MCZ_T("Unlocking auger", "Déblocage vis");
+      return MCZ_T("Unlocking auger", "Déblocage vis", "Förderschnecke lösen");
     case 45:
-      return MCZ_T("Auto eco", "Auto éco");
+      return MCZ_T("Auto eco", "Auto éco", "Eco");
     case 46:
-      return MCZ_T("Standby", "Veille");
+      return MCZ_T("Standby", "Veille", "Bereit");
     case 49:
-      return MCZ_T("Loading auger", "Chargement vis");
+      return MCZ_T("Loading auger", "Chargement vis", "Förderschnecke füllen");
     case 50:
-      return MCZ_T("A01 - Ignition failed", "A01 - Allumage raté");
+      return MCZ_T("A01 - Ignition failed", "A01 - Allumage raté", "A01 - Zündung fehlgeschlagen");
     case 51:
-      return MCZ_T("A02 - No flame", "A02 - Pas de flamme");
+      return MCZ_T("A02 - No flame", "A02 - Pas de flamme", "A02 - Flamme aus");
     case 52:
-      return MCZ_T("A03 - Tank overheating", "A03 - Surchauffe réservoir");
+      return MCZ_T("A03 - Tank overheating", "A03 - Surchauffe réservoir", "A03 - Pelletbehälter zu heiß");
     case 53:
-      return MCZ_T("A04 - Flue gas too hot", "A04 - Fumées trop chaudes");
+      return MCZ_T("A04 - Flue gas too hot", "A04 - Fumées trop chaudes", "A04 - Abgas zu heiß");
     case 54:
-      return MCZ_T("A05 - Flue obstructed / wind", "A05 - Conduit obstrué / vent");
+      return MCZ_T("A05 - Flue obstructed / wind", "A05 - Conduit obstrué / vent", "A05 - Abgasrohr verstopft / Wind");
     case 55:
-      return MCZ_T("A06 - Insufficient draught", "A06 - Tirage insuffisant");
+      return MCZ_T("A06 - Insufficient draught", "A06 - Tirage insuffisant", "A06 - Zu wenig Zug");
     case 56:
-      return MCZ_T("A09 - Flue gas probe", "A09 - Sonde fumées");
+      return MCZ_T("A09 - Flue gas probe", "A09 - Sonde fumées", "A09 - Abgasfühler defekt");
     case 57:
-      return MCZ_T("A11 - Gear motor", "A11 - Motoréducteur");
+      return MCZ_T("A11 - Gear motor", "A11 - Motoréducteur", "A11 - Getriebemotor");
     case 58:
-      return MCZ_T("A13 - Mainboard temperature", "A13 - Température carte mère");
+      return MCZ_T("A13 - Mainboard temperature", "A13 - Température carte mère", "A13 - Platine zu heiß");
     case 59:
-      return MCZ_T("A14 - Active fault", "A14 - Défaut Active");
+      return MCZ_T("A14 - Active fault", "A14 - Défaut Active", "A14 - Active-Sensor gestört");
     case 60:
-      return MCZ_T("A18 - Water temperature", "A18 - Température eau");
+      return MCZ_T("A18 - Water temperature", "A18 - Température eau", "A18 - Wasser zu heiß");
     case 61:
-      return MCZ_T("A19 - Water probe", "A19 - Sonde eau");
+      return MCZ_T("A19 - Water probe", "A19 - Sonde eau", "A19 - Wasserfühler defekt");
     case 62:
-      return MCZ_T("A20 - Auxiliary probe", "A20 - Sonde auxiliaire");
+      return MCZ_T("A20 - Auxiliary probe", "A20 - Sonde auxiliaire", "A20 - Zusatzfühler defekt");
     case 63:
-      return MCZ_T("A21 - Pressure switch", "A21 - Pressostat");
+      return MCZ_T("A21 - Pressure switch", "A21 - Pressostat", "A21 - Druckwächter");
     case 64:
-      return MCZ_T("A22 - Room probe", "A22 - Sonde ambiante");
+      return MCZ_T("A22 - Room probe", "A22 - Sonde ambiante", "A22 - Raumfühler defekt");
     case 65:
-      return MCZ_T("A23 - Brazier closing", "A23 - Fermeture brasier");
+      return MCZ_T("A23 - Brazier closing", "A23 - Fermeture brasier", "A23 - Brennschale schließt nicht");
     case 66:
-      return MCZ_T("A12 - Gear motor controller", "A12 - Contrôle motoréducteur");
+      return MCZ_T("A12 - Gear motor controller", "A12 - Contrôle motoréducteur", "A12 - Getriebemotor-Steuerung");
     case 67:
-      return MCZ_T("A17 - Auger jammed", "A17 - Vis sans fin bloquée");
+      return MCZ_T("A17 - Auger jammed", "A17 - Vis sans fin bloquée", "A17 - Förderschnecke blockiert");
     case 69:
-      return MCZ_T("Waiting for safety alarms", "Attente alarmes sécurité");
+      return MCZ_T("Waiting for safety alarms", "Attente alarmes sécurité", "Wartet auf Sicherheitsprüfung");
     default:
-      return MCZ_T("Unknown", "Inconnu");
+      return MCZ_T("Unknown", "Inconnu", "Unbekannt");
   }
 }
 #endif
@@ -584,7 +586,7 @@ void MczMaestro::handle_aux_(MczAuxKind kind) {
     if (format_timestamp(values.get(2), buf, sizeof(buf))) {
       this->publish_text_(TEXT_PROBE_LAST_SEEN, buf);
     } else {
-      this->publish_text_(TEXT_PROBE_LAST_SEEN, MCZ_T("Never", "Jamais"));
+      this->publish_text_(TEXT_PROBE_LAST_SEEN, MCZ_T("Never", "Jamais", "Nie"));
     }
   }
 #endif
@@ -656,8 +658,8 @@ void MczMaestro::handle_alarms_() {
   }
 
   if (count == 0) {
-    this->publish_text_(TEXT_LAST_ALARM, MCZ_T("None", "Aucune"));
-    this->publish_text_(TEXT_ALARM_HISTORY, MCZ_T("None", "Aucune"));
+    this->publish_text_(TEXT_LAST_ALARM, MCZ_T("None", "Aucune", "Keiner"));
+    this->publish_text_(TEXT_ALARM_HISTORY, MCZ_T("None", "Aucune", "Keiner"));
     return;
   }
 
@@ -821,23 +823,23 @@ void MczMaestro::publish_texts_(const MczInfo &info) {
   }
 
   if (info.has(15) && changed(TEXT_VALVE, (int32_t) info.get(15)))
-    this->text_sensors_[TEXT_VALVE]->publish_state(info.get(15) == 1 ? MCZ_T("Domestic hot water", "Sanitaire")
-                                                                      : MCZ_T("Heating", "Chauffage"));
+    this->text_sensors_[TEXT_VALVE]->publish_state(info.get(15) == 1 ? MCZ_T("Domestic hot water", "Sanitaire", "Warmwasser")
+                                                                      : MCZ_T("Heating", "Chauffage", "Heizung"));
 
   if (info.has(FIELD_PELLET_SENSOR) && changed(TEXT_PELLET, (int32_t) info.get(FIELD_PELLET_SENSOR))) {
     const char *text;
     switch (info.get(FIELD_PELLET_SENSOR)) {
       case 0:
-        text = MCZ_T("No sensor", "Absent");
+        text = MCZ_T("No sensor", "Absent", "Kein Sensor");
         break;
       case 10:
-        text = MCZ_T("Level OK", "Niveau correct");
+        text = MCZ_T("Level OK", "Niveau correct", "Füllstand OK");
         break;
       case 11:
-        text = MCZ_T("Tank empty", "Réservoir vide");
+        text = MCZ_T("Tank empty", "Réservoir vide", "Behälter leer");
         break;
       default:
-        text = MCZ_T("Unknown", "Inconnu");
+        text = MCZ_T("Unknown", "Inconnu", "Unbekannt");
         break;
     }
     this->text_sensors_[TEXT_PELLET]->publish_state(text);
